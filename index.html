@@ -156,6 +156,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
         <label><input type="checkbox" value="restaurant" checked> Restaurants</label>
         <label><input type="checkbox" value="fast_food" checked> Fast food</label>
         <label><input type="checkbox" value="cafe"> Caf&eacute;s</label>
+        <label><input type="checkbox" value="bar|pub"> Bars &amp; pubs</label>
       </div>
     </div>
     <p class="note">Places with unknown hours or price are still shown, tagged "unknown", because OpenStreetMap data is incomplete.</p>
@@ -213,7 +214,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 5 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  Version 6 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -456,7 +457,7 @@ $("#sortChips").addEventListener("click", e => {
   const b = e.target.closest("button[data-sort]"); if (!b) return;
   state.sort = b.dataset.sort; state.bag = [];
   document.querySelectorAll("#sortChips .chip").forEach(c => c.setAttribute("aria-pressed", String(c === b)));
-  refilter();
+  refilter(); checkTopForChains();
 });
 $("#openNow").addEventListener("change", e => { state.openNow = e.target.checked; refilter(); });
 $("#typeChecks").addEventListener("change", e => {
@@ -566,8 +567,15 @@ function toPlace(el, center){
     brand: t.brand || "", brandQid: t["brand:wikidata"] || "",
     notable: !!(t.wikipedia || t.wikidata) && !t["brand:wikidata"],
     michelin: String(t["award:michelin"] || t["michelin"] || "").toLowerCase().trim(),
-    city: t["addr:city"] || ""
+    city: t["addr:city"] || "",
+    sport: t.sport || "", food: t.food || "",
+    siteHost: siteParts(site).host, sitePath: siteParts(site).path
   };
+}
+
+function siteParts(u){
+  try{ const x = new URL(u); return {host: x.hostname.replace(/^www\./, "").toLowerCase(), path: x.pathname.toLowerCase()}; }
+  catch(_){ return {host: "", path: ""}; }
 }
 
 /* Source 1: Overpass (full OpenStreetMap query). Several free public servers are asked at once; first good answer wins. */
@@ -612,7 +620,7 @@ function overpass(q, outerSignal, report){
 }
 
 /* Source 2 (backup): Nominatim, the same service the address box uses. Max ~40 results per place type, 1 request/second. */
-const NOM_PHRASE = {restaurant: "restaurant", fast_food: "fast food", cafe: "cafe"};
+const NOM_PHRASE = {restaurant: "restaurant", fast_food: "fast food", cafe: "cafe", bar: "bar", pub: "pub"};
 const sleep = (ms, signal) => new Promise((res, rej) => {
   const t = setTimeout(res, ms);
   signal.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("Aborted", "AbortError")); }, {once:true});
@@ -654,6 +662,7 @@ function fitToRadius(){
 
 async function runSearch(){
   if (searchCtl){ searchCtl.abort(); return; }            // second tap = cancel
+  wideGen++; state.chainChecking = false;
   if (!state.center){ toast("Set a location first."); $("#locLabel").scrollIntoView({behavior:"smooth", block:"center"}); return; }
   const btn = $("#btnSearch");
   searchCtl = new AbortController();
@@ -670,7 +679,7 @@ async function runSearch(){
   const {lat, lon} = state.center;
   const center = {lat, lon};
   const R = Math.round(state.radiusMi * MI);
-  const typeList = [...state.types];
+  const typeList = [...state.types].flatMap(t => t.split("|"));
   const q = `[out:json][timeout:${overpassTimeoutMs(state.radiusMi) / 1000}];nw["amenity"~"^(${typeList.join("|")})$"]["name"](around:${R},${lat},${lon});out center ${state.radiusMi > 10 ? 1500 : 400};`;
 
   const problems = [];
@@ -710,6 +719,7 @@ async function runSearch(){
     state.searched = true; state.bag = [];
     render();
     if (source === "backup") st.innerHTML += '<br><small>Used the backup source (up to 40 places per type), since the main servers were busy.</small>';
+    checkTopForChains();
   }catch(err){
     st.textContent = "Got results but couldn't display them: " + err.message;
     console.error(err);
@@ -729,55 +739,182 @@ function directionsUrl(p){
 const fmtDist = d => d < 0.1 ? "<0.1 mi" : d.toFixed(1) + " mi";
 
 /* ---------- ranking ----------
-   OpenStreetMap has no star ratings, so this scores each place on signals that tend to go with good food:
-   awards, independence (not a chain), notability, a specific cuisine, sit-down service, and a well-kept listing.
-   Every point is explained on the card. Scores are relative to this search, not absolute. */
-const CHAINS = new Set(["mcdonald s","burger king","wendy s","subway","taco bell","kfc","chick fil a","popeyes","arby s","sonic","sonic drive in",
-  "dairy queen","jack in the box","carl s jr","hardee s","five guys","shake shack","in n out burger","whataburger","culver s","checkers","rally s",
-  "white castle","wingstop","buffalo wild wings","domino s","domino s pizza","pizza hut","papa john s","little caesars","papa murphy s","marco s pizza",
-  "chipotle","chipotle mexican grill","qdoba","moe s southwest grill","panda express","p f chang s","starbucks","dunkin","dunkin donuts","tim hortons",
-  "panera bread","jersey mike s","jimmy john s","firehouse subs","potbelly","jason s deli","olive garden","red lobster","applebee s","chili s",
+   OpenStreetMap has no star ratings, so each place is scored on signals that tend to go with good food:
+   expert awards, independence (not a chain), a specific cuisine, food-first service and a well-kept listing.
+   Every point is shown on the card. Scores are relative to this search, not absolute. */
+
+// National chains (any name starting with one of these, or a close misspelling, counts).
+const NATIONAL_CHAINS = ["mcdonald s","burger king","wendy s","subway","taco bell","kfc","kentucky fried chicken","chick fil a","popeyes","arby s",
+  "sonic drive in","dairy queen","jack in the box","carl s jr","hardee s","five guys","shake shack","in n out","whataburger","culver s","checkers",
+  "rally s","white castle","wingstop","buffalo wild wings","domino s","pizza hut","papa john s","papa johns","little caesars","papa murphy s",
+  "marco s pizza","chipotle","qdoba","moe s southwest","panda express","p f chang s","starbucks","dunkin","tim hortons","panera","jersey mike s",
+  "jimmy john s","firehouse subs","potbelly","jason s deli","mcalister s deli","olive garden","red lobster","applebee s","chili s","tgi friday s",
   "tgi fridays","outback steakhouse","longhorn steakhouse","texas roadhouse","cracker barrel","denny s","ihop","waffle house","bob evans",
-  "red robin","ruby tuesday","cheesecake factory","the cheesecake factory","bj s restaurant brewhouse","hooters","golden corral","perkins",
-  "zaxby s","raising cane s","bojangles","church s chicken","el pollo loco","del taco","cook out","steak n shake","krystal","bob evans",
-  "noodles company","sweetgreen","cava","tropical smoothie cafe","smoothie king","jamba","boston market","long john silver s","captain d s",
-  "cinnabon","auntie anne s","baskin robbins","cold stone creamery","krispy kreme","einstein bros bagels","mod pizza","blaze pizza","wawa","sheetz"]);
+  "red robin","ruby tuesday","cheesecake factory","bj s restaurant","hooters","twin peaks","golden corral","perkins restaurant","zaxby s","raising cane s",
+  "bojangles","church s chicken","church s texas chicken","el pollo loco","del taco","cook out","steak n shake","krystal","noodles and company",
+  "noodles company","sweetgreen","cava","tropical smoothie","smoothie king","jamba","boston market","long john silver s","captain d s","cinnabon",
+  "auntie anne s","baskin robbins","cold stone","krispy kreme","einstein bros","mod pizza","blaze pizza","wawa","sheetz","bonchon","nando s",
+  "miller s ale house","yard house","dave and buster s","famous dave s","ted s montana grill","carrabba s","bonefish grill","ruth s chris",
+  "morton s the steakhouse","the capital grille","capital grille","fogo de chao","seasons 52","bahama breeze","chuy s","mellow mushroom","zoes kitchen",
+  "smashburger","habit burger","freddy s frozen custard","crumbl","insomnia cookies","corner bakery","au bon pain","rita s italian ice","jet s pizza","hungry howie s","east coast wings","pf chang s","primanti bros","eggs up grill","first watch","another broken egg",
+  "huddle house","dickey s barbecue","sonny s bbq","city barbeque","pei wei","hibachi grill and supreme buffet","golden chick",
+  "wing stop","charleys philly steaks","sbarro","jollibee","pollo campero","tropical smoothie cafe","walk on s","old chicago","world of beer"];
+// Mid-Atlantic regional chains. Seed list; the wider-area check below catches ones that aren't here.
+const REGIONAL_CHAINS = ["greene turtle","glory days grill","silver diner","ledo pizza","hard times cafe","mission bbq","jerry s subs",
+  "pizza boli s","royal farms","matchbox","bertucci s","chesapeake bagel","potomac pizza","el pollo rico","nalley fresh","roti mediterranean",
+  "and pizza","cava grill","famous anthony s","founding farmers","farmers and distillers","busboys and poets","jaleo","lebanese taverna","clyde s"];
+// Multi-location restaurant groups known for their food: they lose the "independent" bonus but get only a light penalty.
+const LIGHT_GROUPS = new Set(["founding farmers","farmers and distillers","busboys and poets","jaleo","lebanese taverna","clyde s"]);
+const NOT_CHAINS = new Set([]);
+
 const GENERIC_CUISINE = new Set(["american","burger","burgers","pizza","sandwich","fast_food","coffee_shop","coffee","chicken","fried_chicken",
   "regional","international","ice_cream","donut","bagel","hot_dog","wings","breakfast","diner","deli","juice","bubble_tea","snack","sub","subs"]);
-const MICHELIN = {"3":[50,"3 Michelin stars"],"2":[45,"2 Michelin stars"],"1":[40,"Michelin star"],
-  "bib_gourmand":[32,"Michelin Bib Gourmand"],"bib gourmand":[32,"Michelin Bib Gourmand"],"selected":[22,"Michelin Guide pick"],"yes":[22,"Michelin Guide pick"]};
+const BAR_FOOD = new Set(["american","burger","burgers","wings","chicken","hot_dog","pub","bar","sandwich","pizza","fries","nachos"]);
+const MICHELIN = {"3":[50,"3 Michelin stars",true],"2":[45,"2 Michelin stars",true],"1":[40,"Michelin star",true],
+  "bib_gourmand":[32,"Michelin Bib Gourmand",false],"bib gourmand":[32,"Michelin Bib Gourmand",false],
+  "selected":[22,"Michelin Guide pick",false],"yes":[22,"Michelin Guide pick",false]};
+// Websites many unrelated places use, so a shared one doesn't mean a chain.
+const SHARED_HOSTS = /(^|\.)(facebook|instagram|google|business\.site|sites\.google|wixsite|wix|squarespace|square\.site|toasttab|toast|yelp|doordash|grubhub|ubereats|linktr\.ee|order\.online|menufy|clover|chownow|popmenu|spoton|tripadvisor|opentable|resy|weebly|godaddysites|wordpress|blogspot|beyondmenu|menupages|slicelife|mealsy|order\.app|orderonlinemenu|restaurantji)\b/;
+
+/* Name normalizing: lower case, no accents/punctuation, "&" -> "and", no leading "the",
+   and no location suffix ("The Greene Turtle - Towson" -> "greene turtle"). */
+function chainKey(name){
+  let n = String(name || "").replace(/\s+[-–—|@(:].*$/, "");
+  n = norm(n.replace(/&/g, " and ")).replace(/^the /, "");
+  return n;
+}
+function lev(a, b){
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  const dp = Array.from({length: b.length + 1}, (_, i) => i);
+  for (let i = 1; i <= a.length; i++){
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= b.length; j++){
+      const tmp = dp[j];
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+const prepList = arr => [...new Set(arr.map(chainKey))].filter(k => k && !NOT_CHAINS.has(k));
+const NATIONAL_KEYS = prepList(NATIONAL_CHAINS), REGIONAL_KEYS = prepList(REGIONAL_CHAINS);
+/* Returns the list key that matches: exact, "starts with" (e.g. "greene turtle sports bar and grille"),
+   or a close misspelling for names of 8+ letters (e.g. "green turtle"). Short names must match exactly. */
+function listMatch(key, keys){
+  if (!key) return null;
+  for (const k of keys){
+    if (key === k) return k;
+    if (k.length >= 4 && key.startsWith(k + " ")) return k;
+    if (k.length >= 8){
+      const words = k.split(" ").length;
+      const head = key.split(" ").slice(0, words).join(" ");
+      if (lev(head, k) <= (k.length >= 12 ? 2 : 1)) return k;
+    }
+  }
+  return null;
+}
+
+/* Wider-area chain check: counts same-name places within ~50 miles for the top unknown picks (one extra server request per search). */
+const wideCounts = new Map();   // chainKey -> number of locations found within 50 mi
+let wideGen = 0;
+function overpassRe(name){
+  const base = String(name).replace(/\s+[-–—|@(:].*$/, "").replace(/^the\s+/i, "").trim();
+  const re = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return re.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+async function checkTopForChains(){
+  if (!state.searched || !state.center) return;
+  const gen = ++wideGen;
+  const pool = (state.sort === "near" ? [...state.visible].sort((a, b) => b.rank - a.rank) : state.visible)
+    .filter(p => !p.chainScope && !wideCounts.has(chainKey(p.name)) && chainKey(p.name).length >= 4);
+  const picks = []; const keys = new Set();
+  for (const p of pool){ const k = chainKey(p.name); if (!keys.has(k)){ keys.add(k); picks.push(p); } if (picks.length >= 8) break; }
+  if (!picks.length) return;
+  const {lat, lon} = state.center;
+  const q = "[out:json][timeout:20];" + picks.map(p =>
+    `nw["amenity"]["name"~"^(the )?${overpassRe(p.name)}",i](around:80000,${lat},${lon});out count;`).join("");
+  state.chainChecking = true; render();
+  let json = null;
+  try{ json = await overpass(q, new AbortController().signal, () => {}); }catch(_){}
+  if (gen !== wideGen) return;            // a newer search started
+  state.chainChecking = false;
+  if (!json){ render(); return; }
+  const counts = (json.elements || []).filter(e => e.type === "count");
+  let found = 0;
+  picks.forEach((p, i) => {
+    const n = counts[i] ? +counts[i].tags.total || 0 : 0;
+    wideCounts.set(chainKey(p.name), n);
+    if (n >= 3) found++;
+  });
+  render();
+  if (found) toast(`Found ${found} chain${found === 1 ? "" : "s"} in your top picks and moved ${found === 1 ? "it" : "them"} down.`);
+}
 
 function scorePlaces(list){
-  // Same name 3+ times in this search = a chain even if it isn't tagged as one (catches regional chains).
-  const counts = {};
-  for (const p of list){ const k = norm(p.name); counts[k] = (counts[k] || 0) + 1; }
+  const nameCounts = {}, hostCounts = {};
+  for (const p of list){
+    const k = chainKey(p.name); nameCounts[k] = (nameCounts[k] || 0) + 1;
+    if (p.siteHost && !SHARED_HOSTS.test(p.siteHost)) hostCounts[p.siteHost] = (hostCounts[p.siteHost] || 0) + 1;
+  }
   for (const p of list){
     const why = []; let s = 30;
-    const add = (n, label) => { s += n; if (label) why.push((n > 0 ? "+" : "") + n + " " + label); };
-    const key = norm(p.name);
-    const chain = !!p.brandQid || CHAINS.has(key) || CHAINS.has(norm(p.brand)) || counts[key] >= 3;
-    p.chain = chain;
+    const add = (n, label) => { if (!n) return; s += n; why.push((n > 0 ? "+" : "") + n + " " + label); };
+    const key = chainKey(p.name), bkey = chainKey(p.brand);
+
+    // --- chain detection, strongest signal first ---
+    let scope = null, how = "";
+    const nat = listMatch(key, NATIONAL_KEYS) || (bkey && listMatch(bkey, NATIONAL_KEYS));
+    const reg = listMatch(key, REGIONAL_KEYS) || (bkey && listMatch(bkey, REGIONAL_KEYS));
+    const wide = wideCounts.get(key) || 0;
+    if (nat){ scope = "national"; how = "national chain"; }
+    else if (p.brandQid){ scope = "regional"; how = "tagged as a chain brand"; }
+    else if (reg){ scope = LIGHT_GROUPS.has(reg) ? "group" : "regional"; how = LIGHT_GROUPS.has(reg) ? "local restaurant group" : "regional chain"; }
+    else if (wide >= 3){ scope = "regional"; how = `${wide} locations within 50 mi`; }
+    else if (nameCounts[key] >= 3){ scope = "regional"; how = "repeats nearby"; }
+    else if (p.brand && chainKey(p.brand) !== key){ scope = "group"; how = "part of a brand"; }
+    else if (p.siteHost && hostCounts[p.siteHost] >= 2){ scope = "group"; how = "shares a website with another listing"; }
+    else if (/\/locations?\//.test(p.sitePath)){ scope = "group"; how = "website lists multiple locations"; }
+    else if (nameCounts[key] === 2 || wide === 2){ scope = "group"; how = "2 locations"; }
+    p.chainScope = scope; p.chain = scope === "national" || scope === "regional";
+
     const m = MICHELIN[p.michelin];
     if (m) add(m[0], m[1]);
-    if (chain) add(-20, counts[key] >= 3 && !p.brandQid && !CHAINS.has(key) ? "repeats nearby (chain)" : "chain");
-    else add(18, "independent");
-    if (p.notable) add(10, "has its own Wikipedia/Wikidata entry");
+    if (scope === "national") add(-35, how);
+    else if (scope === "regional") add(-25, how);
+    else if (scope === "group") add(-5, how);
+    else add(15, "independent");
+    if (p.notable) add(8, "has its own Wikipedia/Wikidata entry");
+
+    // --- food focus ---
     const specific = p.cuisines.filter(c => !GENERIC_CUISINE.has(c));
+    const barFoodOnly = p.cuisines.length > 0 && p.cuisines.every(c => BAR_FOOD.has(c));
     if (specific.length) add(8, "specific cuisine");
-    else if (p.cuisines.length) add(3, "cuisine listed");
-    if (p.amenity === "restaurant") add(6, "sit-down");
-    else if (p.amenity === "cafe") add(2, "caf\u00E9");
+    else if (p.cuisines.length && !barFoodOnly) add(3, "cuisine listed");
+    const nm = norm(p.name);
+    const sportsBar = !!p.sport || /\bsports?\b/.test(nm) && /\b(bar|grill|grille|pub|tavern|lounge)\b/.test(nm);
+    const barFirst = p.amenity === "bar" || p.amenity === "pub" ||
+      /\b(tavern|saloon|taphouse|tap house|tap room|taproom|ale house|alehouse|pub|bar and grill|bar and grille|bar grill|bar grille)\b/.test(nm.replace(/&/g, "and"));
+    p.sportsBar = sportsBar; p.barFirst = barFirst;
+    if (sportsBar) add(-15, "sports bar (food is secondary)");
+    else if (barFirst) add(-8, "bar or pub");
+    else if (p.amenity === "restaurant") add(6, "sit-down");
+    else if (p.amenity === "cafe") add(3, "café");
+    else if (p.amenity === "fast_food" && !scope) add(2, "independent counter service");
+
     const details = [p.hours, p.site, p.phone, p.addr, p.price && !p.price.est].filter(Boolean).length + (p.diet.length ? 1 : 0);
     if (details >= 4) add(6, "well-kept listing");
     else if (details >= 2) add(3, "some listing details");
     if (p.diet.length) add(2, "dietary options");
+
     p.baseScore = s;
-    p.gem = !chain && !m && !p.notable && specific.length > 0 && p.amenity !== "fast_food" && details >= 2;
-    p.award = m ? m[1] : ""; p.awardPts = m ? m[0] : 0;
+    p.award = m ? m[1] : ""; p.awardPts = m ? m[0] : 0; p.starred = !!(m && m[2]);
+    const foodFirst = p.amenity === "restaurant" || p.amenity === "cafe" || (barFirst && specific.length > 0);
+    p.gem = !p.chain && !p.starred && !p.notable && !sportsBar && foodFirst && specific.length > 0 && details >= 1;
     p.why = why;
   }
 }
-/* Adds the per-search adjustments (distance, open now, and for "Hidden gems" mode a boost for under-the-radar places). */
+
+/* Adds the per-search adjustments (distance, open now, and for "Hidden gems" a boost for under-the-radar places). */
 function applyRank(p, mode){
   const extra = []; let s = p.baseScore;
   const add = (n, label) => { n = Math.round(n); if (!n) return; s += n; extra.push((n > 0 ? "+" : "") + n + " " + label); };
@@ -788,10 +925,12 @@ function applyRank(p, mode){
   if (p.open === true) add(3, "open now"); else if (p.open === false) add(-3, "closed now");
   if (mode === "gems"){
     if (p.gem) add(20, "under-the-radar local spot");
+    if (p.gem && p.awardPts && !p.starred) add(10, "expert pick that isn't famous");
     if (p.chain) add(-20, "chains aren't gems");
-    if (p.awardPts) add(-p.awardPts / 2, "already famous (award)");
+    if (p.starred) add(-p.awardPts / 2, "already famous (stars)");
     if (p.notable) add(-8, "already well known");
   }
+  if (p.chain && !p.awardPts && s > 55){ extra.push(`capped at 55 (chain)`); s = 55; }
   p.rank = s;
   p.whyAll = ["base 30"].concat(p.why, extra);
 }
@@ -818,6 +957,7 @@ function cardHTML(p, opts){
   ].join("");
   const award = p.award ? `<span class="badge award">${esc(p.award)}</span>` : "";
   const gem = p.gem ? '<span class="badge gem">Hidden gem pick</span>' : "";
+  const chainB = p.chain ? `<span class="badge bad">${p.chainScope === "national" ? "National chain" : "Regional chain"}</span>` : "";
   return `<article class="card${opts.dim ? " dim" : ""}">
     <div class="head">
       <div class="score" title="Ranking score">${displayScore(p)}<small>SCORE</small></div>
@@ -826,7 +966,7 @@ function cardHTML(p, opts){
         ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
       </div>
     </div>
-    <div class="badges">${award}${gem}${open}${price}${cu}${diet}</div>
+    <div class="badges">${award}${gem}${chainB}${open}${price}${cu}${diet}</div>
     ${p.whyAll ? `<div class="whyrank">Score: ${esc(p.whyAll.join(", "))}</div>` : ""}
     ${p.hours && p.open !== null ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
     <div class="actions">${acts}</div>
@@ -855,6 +995,7 @@ function render(){
     st.textContent = "Nothing found here. Try a bigger distance or more place types.";
   } else {
     let s = `${vis.length} place${vis.length === 1 ? "" : "s"} within ${state.radiusMi} mi, ${mode === "near" ? "nearest first" : mode === "gems" ? "independent local spots first" : "best match first"}.`;
+    if (state.chainChecking) s += ' <br><small><span class="spin"></span>Checking top picks for chain locations nearby...</small>';
     if (hid.length) s += ` ${hid.length} hidden by your filters. <button class="link" type="button" id="toggleHidden">${state.showHidden ? "Hide them" : "Show them"}</button>`;
     st.innerHTML = s;
   }
