@@ -197,7 +197,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 2 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  Version 3 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -544,33 +544,79 @@ function toPlace(el, center){
   };
 }
 
-/* Several free public Overpass servers. All are asked at once; the first good answer wins and the rest are cancelled. */
+/* Source 1: Overpass (full OpenStreetMap query). Several free public servers are asked at once; first good answer wins. */
 const ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
 ];
-const SEARCH_TIMEOUT_MS = 25000;
+const OVERPASS_TIMEOUT_MS = 15000;
 let searchCtl = null;
 
-function overpass(q, outerSignal){
+function firstSuccess(promises){
+  if (Promise.any) return Promise.any(promises);
+  return new Promise((res, rej) => { let n = promises.length; promises.forEach(p => p.then(res, () => { if (--n === 0) rej(new Error("all failed")); })); });
+}
+const hostOf = u => u.replace(/^https?:\/\//, "").split("/")[0];
+function reasonOf(err){
+  if (err && err.name === "AbortError") return "no answer in time";
+  if (err && /Load failed|Failed to fetch|NetworkError/i.test(err.message)) return "blocked or unreachable";
+  return err && err.message || "error";
+}
+
+function overpass(q, outerSignal, report){
   const ctls = ENDPOINTS.map(() => new AbortController());
   const abortAll = () => ctls.forEach(c => c.abort());
   outerSignal.addEventListener("abort", abortAll, {once:true});
-  const timer = setTimeout(abortAll, SEARCH_TIMEOUT_MS);
+  const timer = setTimeout(abortAll, OVERPASS_TIMEOUT_MS);
   const tries = ENDPOINTS.map(async (url, i) => {
-    const r = await fetch(url + "?data=" + encodeURIComponent(q), {signal: ctls[i].signal});
-    if (r.status === 429 || r.status === 504) throw new Error("busy");
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const json = await r.json();
-    // Overpass reports server-side timeouts as HTTP 200 with a "remark" and no data
-    if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) throw new Error("busy");
-    return json;
+    try{
+      const r = await fetch(url + "?data=" + encodeURIComponent(q), {signal: ctls[i].signal});
+      if (!r.ok) throw new Error(r.status === 429 ? "busy (HTTP 429)" : r.status === 504 ? "busy (HTTP 504)" : "HTTP " + r.status);
+      const json = await r.json();
+      if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) throw new Error("server timed out");
+      return json;
+    }catch(err){ report(hostOf(url) + ": " + reasonOf(err)); throw err; }
   });
-  return Promise.any(tries).then(
+  return firstSuccess(tries).then(
     json => { clearTimeout(timer); abortAll(); return json; },
     () => { clearTimeout(timer); throw new Error(outerSignal.aborted ? "cancelled" : "failed"); }
   );
+}
+
+/* Source 2 (backup): Nominatim, the same service the address box uses. Max ~40 results per place type, 1 request/second. */
+const NOM_PHRASE = {restaurant: "restaurant", fast_food: "fast food", cafe: "cafe"};
+const sleep = (ms, signal) => new Promise((res, rej) => {
+  const t = setTimeout(res, ms);
+  signal.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("Aborted", "AbortError")); }, {once:true});
+});
+async function nominatimPlaces(center, radiusMi, types, signal, report){
+  const dLat = radiusMi / 69, dLon = radiusMi / (69 * Math.cos(center.lat * Math.PI / 180));
+  const vb = [center.lon - dLon, center.lat + dLat, center.lon + dLon, center.lat - dLat].map(n => n.toFixed(5)).join(",");
+  const out = []; let ok = 0;
+  for (const [i, t] of types.entries()){
+    if (i) await sleep(1100, signal);
+    const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=40&bounded=1&extratags=1&addressdetails=1"
+      + "&viewbox=" + vb + "&q=" + encodeURIComponent(NOM_PHRASE[t] || t);
+    try{
+      const r = await fetch(url, {signal});
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const arr = await r.json(); ok++;
+      for (const d of arr){
+        if (d.category !== "amenity" || !types.includes(d.type)) continue;
+        const a = d.address || {}, x = d.extratags || {};
+        out.push({type: d.osm_type, id: d.osm_id, lat: +d.lat, lon: +d.lon, tags: Object.assign({}, x, {
+          amenity: d.type, name: d.name || (a[d.type]) || "",
+          "addr:housenumber": a.house_number, "addr:street": a.road, "addr:city": a.city || a.town || a.village || a.suburb
+        })});
+      }
+    }catch(err){
+      if (signal.aborted) throw new Error("cancelled");
+      report("nominatim (" + t + "): " + reasonOf(err));
+    }
+  }
+  if (!ok) throw new Error("failed");
+  return {elements: out};
 }
 
 function fitToRadius(){
@@ -584,10 +630,12 @@ async function runSearch(){
   if (!state.center){ toast("Set a location first."); $("#locLabel").scrollIntoView({behavior:"smooth", block:"center"}); return; }
   const btn = $("#btnSearch");
   searchCtl = new AbortController();
+  const signal = searchCtl.signal;
   btn.textContent = "Cancel search";
   const t0 = Date.now();
   const st = $("#status");
-  const tick = () => { st.innerHTML = `<span class="spin"></span>Looking for places nearby... ${Math.round((Date.now() - t0) / 1000)}s`; };
+  let phase = "Looking for places nearby";
+  const tick = () => { st.innerHTML = `<span class="spin"></span>${phase}... ${Math.round((Date.now() - t0) / 1000)}s`; };
   tick(); const ticker = setInterval(tick, 1000);
   $("#cards").innerHTML = "";
   $("#results").scrollIntoView({behavior:"smooth", block:"start"});
@@ -595,14 +643,23 @@ async function runSearch(){
   const {lat, lon} = state.center;
   const center = {lat, lon};
   const R = Math.round(state.radiusMi * MI);
-  const types = [...state.types].join("|");
-  const q = `[out:json][timeout:20];nw["amenity"~"^(${types})$"]["name"](around:${R},${lat},${lon});out center tags 400;`;
+  const typeList = [...state.types];
+  const q = `[out:json][timeout:15];nw["amenity"~"^(${typeList.join("|")})$"]["name"](around:${R},${lat},${lon});out center 400;`;
 
-  let json = null, errMsg = "";
+  const problems = [];
+  const report = m => problems.push(m);
+  let json = null, source = "", errMsg = "";
   try{
-    json = await overpass(q, searchCtl.signal);
+    try{
+      json = await overpass(q, signal, report); source = "overpass";
+    }catch(err){
+      if (err.message === "cancelled") throw err;
+      phase = "Main servers busy, trying backup";
+      tick();
+      json = await nominatimPlaces(center, state.radiusMi, typeList, signal, report); source = "backup";
+    }
   }catch(err){
-    errMsg = err.message;
+    errMsg = signal.aborted ? "cancelled" : err.message;
   }finally{
     clearInterval(ticker);
     searchCtl = null;
@@ -613,16 +670,19 @@ async function runSearch(){
     state.places = [];
     st.innerHTML = errMsg === "cancelled"
       ? 'Search cancelled. <button class="link" type="button" id="retry">Search again</button>'
-      : `The free map data servers are busy or didn't answer within ${SEARCH_TIMEOUT_MS / 1000}s. Try again, or use a smaller distance. <button class="link" type="button" id="retry">Try again</button>`;
+      : `Couldn't reach any restaurant data server. <button class="link" type="button" id="retry">Try again</button>`
+        + `<br><small>Details: ${esc(problems.join("; ") || errMsg)}</small>`;
     return;
   }
 
   // Data processing and drawing are kept separate from the network call, so a display bug can't look like a server failure.
   try{
     const seen = new Set();
-    state.places = (json.elements || []).map(el => toPlace(el, center)).filter(p => p && !seen.has(p.id) && seen.add(p.id));
+    state.places = (json.elements || []).map(el => toPlace(el, center))
+      .filter(p => p && p.dist <= state.radiusMi * 1.02 && !seen.has(p.id) && seen.add(p.id));
     state.searched = true; state.bag = [];
     render();
+    if (source === "backup") st.innerHTML += '<br><small>Used the backup source (up to 40 places per type), since the main servers were busy.</small>';
   }catch(err){
     st.textContent = "Got results but couldn't display them: " + err.message;
     console.error(err);
