@@ -3,8 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f6f5c">
+<meta name="theme-color" content="#1f6f5c" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="Find a good place to eat nearby, skip chains and the food you don't want.">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAUgklEQVR42u1daXRVVZY+0x3emJCETIQpgRhmEARRS3BA0Sq1yxLF2dZGXUqJLqtsu62qrlW66G67VjUWiiiiIiViW05NtUqJ4gCooIxhCBBDEiEh43vJm989Z/ePS2KEKBjey73vvfMtFj9YB16477t7f+fs/e2Dhy64CUlI9AYiH4GEJIeEJIeEJIeEJIeEJIeEJIeEJIeEJIeEJIeEJIeEhCSHhCSHhCSHhCSHhCSHhCSHhCSHhCSHhCSHhCSHhIQkh4Qkh4Qkh4Qkh4Qkh4QtwOQjQAhhjI//IwCQ5MhAHmCMMUIYYwGAEAIh4tw4bhnFhFEKgAjGCCFAIAAyjTAsQwhBMMYIcyHihhE14lwILoTKGEJIU5RclxcQYHSMBxjhzkjYHwoSQmLxOMKYEaIyRWWMEmKGFZEBRGFpzwmEUCQei8RiHIRLcxRkZQ/LKywrKCrMyhlTMtSt6x7dOWxgAQKEzNwCCGHU3OFv8LUhhHbUVrcGOvYcrqtvaz7S3toW7MQIaUzVVZViIkCkMUtwWo5gMN/vSDwWikUpJqX5RROGlE4tq5haVl46sMjjcPbh3wzHovVtzVtrDn5RvW97bXVVQ30oFtMVxalqGGMuhCSHvf8zCBFCAKAjEgYhhucXnV8xbvb4KdNHjvboju5lpnroziMYI4yOF6TQJUnNZd1ByIQhxLZDB9fu3PLBnu17D9dH4zGv06kQxkGkky5JH3IwQuPC6AyHVcZmjpowZ+pPLhk/pZsTXAhAYCqPXvYmpwBAAHCMMWZkQggZgm/cv/v1zRv+tu2LtmCnW9N1RU0biqQDOSghAsAXDGQ5XddM/cnc6TOnDC/v5gRCiOA+EuL7iYJMSdrNkoNHj7z11aaVG9bVthz1OpwqUwzOJTksl5zEHwoojF0//YK7LvzpGUUl3bsJQvCJ+SLhEEJAVyxp6fSv+PT9ZevfbfS15bg9CGEBKaxFaPbZ41M2YFCDGx3h0EVjJ/3pxrvmXXBZnsfLhUAICCZmBum3PZEAEABu3XHOyNGXT5wa48aOuuoYN3RVTd3tTKqSg1HqCwa8Tuej19y68Nrbh+TmmxmEmqywaNsMAAJErts7e/yUKaXl22u/PtTS6FR1jBFIcvQDCMYI47bOjssmnPXCXb+6YPREc/dhFS1OTHMCgIMoHVh07bTzY4bx2YG9CCGFKSmnUlOMHJSQmGHEjPgjV93wxxvuHOBycyHsQIsTKcKF0BX1wjETRw0a8vG+Xe3BTpempVaKSSVyMEo7wqFct3fFXb+eO32mgG+VoD0jHABwEBXFg382adr22up9R+o8DmcK8SNlyKEy1hronFZWseref5kwpNQQnBJqq4DxfSHEEDzH5fmHKef4QsENVbu9Dkeq5JfUIAcjtNHffm75mNXz/7Uga4AhOCM0dUQSEUJoinLp+Cm+UPCD3dvdugMhLMmRGGb4w8Frz57x7B33ex1OLkQKMaM7hAgAQHDJuMlOVft4305GKZbkON1sQlljR/t1Z8945vYFmqIIANuKjJP3E2EshDinfPQAl/v1zRu8TrvrD1uTg1HaGug8r3zMM3csYJQhANInZpg5/qQCJbHLeq0LYoQMwacML++IhD7as9Oj25of9iUHJbQjHJxWdsbq+Y94HS6EUB+Y0XWOTjDG5u6m1y81sctOflaGYNbYyb5QcENVpVtz2JYf9t0HRuOxgd7sbp1B+rQxwRhTQsKxqD8cNM/Ue90pJHbZyfsUERYg/mPu7TNHTfCFg9SuEsqmnWCAUJzzZXfcX5IzsG97EwBAGAXC4T++89f/2/ZFjBtTyyoeuer64QMLAaD7jU/sslPnBwAgQM/Ne+Dihf98tNOnM9WGJTo7phVGaGug43dX3zhn2vl93rWaLcHzli9atv5dQChqxL46dOD9XV9dfdZ5Ll1HcCwjJHbZj92/uDR93ODhqz/7SGFUao5TYkZ7KHDZhKmPXz9P9JUZ5pn6B5XbF779SnF2DsKIIJLtdNW1NmuKMqNiPAdhnnAncFkfUqch+LC8AoWyd3ds8ThsJz6I3fZ7MSOe4/L8+3W34z7tCLrDBkJoZ32NKSHNpkBDcE1RdtUfOla9S/SyvryamHAh5s+68rzyMf5Q0G67dHv9NBSTzkj4d1ffNDQvnwveh9fxuCAEJwiRE0NRYpf1wUzFKH38hnkOReNC2KoeQGxVcfWFArPGTb753Iu44Kev4aG3JooT/zCxy/rwvzYEHzNo6ILZP28PBiimkhy9QAAwyn51+S+6TowyBRQTAXDHzEvLCorD8Zh9qonEPjrUFwzcdO6FU8squOApekbe5+QCILKd7keunBuKRigmkhw9nw6KC57ldN1z8RUAgDMpbHTtXKgAccWZ0ycNG9EZDRN78IPYI67SznBozrTzS/OLRF8LKCkePBAAqIzdO+tKw+A2ySzEHmpDqIzdfO5FKINBMAEEl004a3h+YSQetQM/iB02KR3h0AWjJ44dPEyAoIRk7IwQIYRT1W4858KgPZSHHb4JLACunz7T7NtGGT1DhiCEfjH1vFx3VpwblscOYvnrEolHywqKLxozCRDYR6hbVYsWIIbk5s8cNT4QsV6WEsu3+KFodEbFOJemCyFs3jDcP4c9CKHLJpwlvh0YkqnkAABK6OUTp2bawdcPvC0IoRmjxhVl5cR43Nq3hVicU4xYaX7h1LIzTqd8lW6yFMRAT/b0kaNDkQjJWHIQjMOx2KRhI9yag4PMKd/JLOeVj+VWnwdaGjkQFiCmlVXIyY7f/UowQmhK6UiXplk7TcpKchhCuHXHWaXl3U+k34ROT5zmsiQNRS0rKB6aWxA1YhZmFmJhco3zeKF3wLCBheg0+npQn+aQmlZKhbLjhn392GXJkx1OVRtZNChqGBZmW2ah4IgZxpC8Aremiz612fWVkYY/HDS7gs3+v3Ds+Cr5KS5LquwgGI0qHvLWl5sslB3MQsFhcD6ioNg8Nu6HJ8CFcKratpqD5//hQXNGoPl7xIhlOZyG4D9qWT9gZEExo9RCNWalNYEDDMrJM40I/TPR3AwJrcGO4ypepLfIcdJlycuGZrQoyckjhEAG+lYEgMaYOd8tSZEzbhjQG2MUwk46Av8Ul8UNI3m0LsnNz3N5A7EwI9bED4tNTdl9GiZ8im/esIEFSm9h+RQf9A8vMyepm2ratDwldtouQsjjcCiWphViZeRQVIemJe/YvGRALk1mWBYAJQNyk5QWzZG6Lt0hBOCMIgfG2BBGnttbml+UjMxtNoVvqTkQjceTtAUFBAqlW2r2J+Pg3/RLujVHaX5hzLCswkKsrboltYEjlhxB0DP4x5P8EdY2uKRn/4SpOUYVD6Y0WWkFIxwX4oyiwZZ/hZIcP36SH4JpIyoGZefGjGRlFkbo7AlTkrfbynRyQHLOODDGQkCu2/vQz65tC3QSTBLY0Y4xVpnS4G+bO33GOSNH82T2vQKCzC3ZJ2/0GyWEC3HzeRctmP3z5k5/KBoxZwMRjAkmXb/wSX/CnosJJhjjmGE0+NpmjT3zsTm3CYCklgxPNOhmxDkHJdQfDjX62kYUDOq+FycZV20svPYfp5VVLHrvzZrmhs5wqKfyxwjpqvYDHxyKxXrOVAEAlSlF2QN+/dM5v7zkKkpIHya3nKJUxxhH4rFGX5uFRx3Msu5ATDoioaO+9hEFgyBp7ZLmfQZXTZ5+5ZlnH2g83NTho4Sa1XiMcSAauX/l0x2R0IlHkOZ389icW8cMGsoBKMbm/RguTa8oHqwravdXmDxNHTXijb52Ri0LHsziZut++RSzrFpeVFJeVIK+01DCFcJ6Pz5H2BBiyvDyiUPLUG81PJL8get9noSW8pqDYByNxyvrD/WD7DLPSQWAeWMoF8LgnAvREQ79wEdjhILRCBciZhjdf1GAAASUEJz8442apoamTp9KlcxKK92hu6nD1z9d57hrTGzPpH7SXQbpWmOJD6+5w29wjjMwcgACRsjehrr+bANLFZjxbG/DN3FupamaWHh2rjD2TWtLOB7FfRroidLaoIAQOtB4mBJi4VGHlVVZlSmH21oafG0YYcmN49JZnBtVR+pVxiAzD8EYob5wYGvNQYSQQEJyouu6ScAI17c2f93UoCmqsM6dYK1vBSFAnx/cJ52Q3yEHEgihrYcO+sJBay8PIdY+BU1Rth46EOcGIUTSomcb2GcH9yIAnLGFNyHAoWr7jtRXfnPI7LqTzDCd5YFo+JO9u5yaxkFk+AiGyLs7vrS8AmkfoywgtLm6qqalUWcqZHKzj0BCV9UPKrcZGTZe8gdiB0bo3R1bOLd+bByxXJk7VW334UNbqqtkZgEAQkhbsHNd5VaXpnOrL9kgdpiiF43HV3/+sRzfwkFghP++86ua5qO6olp+MGg9OQzgXodrzbbP61qbzAo7yuCxPobgz3+8VlMUYQMFRuxQSFAobQt0vLFlI0YYIEMzCxcCY7ylumpH3dcuVRc2yLDEJuHUrTle+GRte7ATY5KhdRaMEEKL//42F9wmhUhiEyGmK+qh5qMvbfiAYMwzL3hwISgmX1TvW1e5zetw2USYE/tosSyH6+l1a2pbjtIMm1ZrdknGDOPRN1cdu3wWycjx3eChKqzB1/bntW+bo20yaZPCKSZrtn3+adUur+4UttnP2+jcyeA81+1ZtenDTft3M0Iz5MxDABBMWgMdj721yqM7bJVSid26XADBQ6uXB6ORDBkxKEAQjP/t9ZU1zY12ONuwLzmEEG7dsau+5vG//Q8lJO2VKRecEfrOjs2rNn2Y6/b050yplPTKGpznur1L1q15b+eXjNBkPy9sbcwgpK616cGXn3Vpug01uD1rXaAx5YG/LK1va2aEJk+gAUL8+3smAKHk6eJjo00B3bdiSXOHT2WW+Q9SjBzm0J+WTv/dy58Ix2IIJ37Ggbkhcmv6sIEFMcM4cWAcB57jdJfmFydpKLvps/rNay9+tG9ntsvNbZZQbD2CgQue7XRv2F/5m9deIJiYb1rC311G6K0/mdUZidAepmqMkMpYS4f/ijPPLsrO4Um46IMLzihdtWn9knVrct0eg3N7fgu2u8u+Z0r2OJwbqnb7w8FZYycbQhCME/g9EUwEiFGDhgSjkfcrt6pMYZRhggVAo6995uiJi266W1PUxH4oQijODUbZ6s8++uVLS7KcLjvvx+xLDjO/eB3OdZVbXZrj3PLRiR90jDFG6OKxZ3p054Gjh1sDndF4zKM75k6fufiWe7Nd7oQbrgzOFco27t99y9LH3brD5oYdPHTBTcje1SiMcTgee/Sa2/5p5uxjDuYkzDsIRiOV9Yfi3BhRUFyYnZMME72pMz6t2nX384v94YBKFZsfBNs6cnQzhFH6xpZPg7HoxWMnccETGz/M6eaaopTk5A3Jy3frDi4ETnTM4IJTQt/YsuHGJf8pQKiU2b9+lBLkQBhjr+78eO+OEYWDxpYMSzg/CMbmaEMAwAglfLyCAEEJrWr45palj1NCVMZSorJIUqW5UoDwOl0PvbKsqqGeEprwgGya7mkSpm6YRxqhWHT+iieDkYjGlFQpG5EUKlAplAUikfkrngrFogApU3kxJ8r9/vWVm6urspwuQ3Akpwkm4/Ajy+naXF31+9dXpkrlxRCcEfrXzZ8uW/9Onicrzo0UeuCpoTl6Jm+3rm86sGdIXv6EIaUJFx8J/2kpobvqa+5Y9ieFsZSbQkJSsQHC43A++PKz22urqY3bPgAAIewPBe9c/kQwGrb2/oNMIQcAMEIA4J4XF/tDQdueI3EQBOOHX12+70idfdpC03+8NRfCpet7Dtc9/OpyezYkm1LjhU/Wrtq0PtfjTS2pkaqao2dyceuOLw7uK8weMHnYSMNO4oMLwQjdXls977n/dmk6ICRnn1vwHQxwuX/72orttdX26TkFAIKxPxS858XFpjscUrbZkaT4KAtiCH7Pi4vbgwFiD/Fh3rv+8KvL9xyuM0/ikYwcVgUPt+7Yd6R+/oon7WBoMKXGE2vffHnjhwM9Xts2aqS55ugpPly6vr222qlp00eOtlB8mFJj4/7d81c8le10pYG1Ih3mpRic57g9C99evdE6w4sAIAS3dPrnr3iSUpIewyRI2tzbRSmZv+LJlk4/IRbMcQAQCOH7Vy6tbWlyKlp6OPZI2liDnIpW29J0/8qlqN/nOBiCU0L/vPbNNds+z7Gf/SRzNcdx4mNbbbVT0/tTfPSUGl6njZyukhwn8EPT1lVuHT+ktLywpB/KcgIEIbi+tfm6Jxca3GCWXj0v08rJYRqi6lqbCCFJzf1mF48QcN9LS5r87bqiptnkCJJ+pnVdUZs7fPe9tEQISGpPkNnFs/B/X1m/Z0e2y502UiM900o3P5yavvubWg5i5qgJPOGGhh4e6Pd2fvnQK88NcHnScmBEes6FNd3Yi957M0lubNNBU9fa9MBfljoUFSF5I3WKARyK+q0bO3HiA7qsmaYHOv2kRvqT41s39vNPhBPakGxKjW4PdPpJjXTWHD1fcZem7zlcF4hELh0/OSHig3c1DP/2tRdzPd70nk2VzuQ45sbWnRv2V44oKD59N1SXN6n+tmf+S2FK2t9bSDJhoLjH4Tx9N1QPb9JTgUhEoSztR5aRTLiKICFuqOO8STx9pUYGkSMhbqiU9iZJzZFEN1Sqe5Nk5EiWGyoNvEmSHMlyQ6WBN0mSIyluqPTwJknNkXg3VNp4k2TkSLAbKp28SZIcCXZDpZM3SZIjkW6oNPMmSc2RMDdU+nmTZORACXFDpaU3SZIDJcYNJQROO2+SJMfpuqEWrHwaAWKULnrvjTTzJknNcbri46uaA/neLIzxncsXZTldQgiU8bD77PP+pIjKmMYUfziYCb0apwImH0HXPfI4bhjReFwyQ5IDnXhpF8GYECKZIcnROz+QZIbcrUhIckhIckhIckhIckhIckhIckhIckhIckhIckhISHJISHJISHJISHJISHJISHJISHJISHJISHJISHJIZDT+H8QPLHWkckjHAAAAAElFTkSuQmCC">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20180%20180%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%22180%22%20height%3D%22180%22%20rx%3D%2240%22%20fill%3D%22%231f6f5c%22/%3E%3Cpath%20d%3D%22M90%2030a48%2048%200%200%201%2048%2048c0%2014-6%2022-10%2028L90%20156%2052%20106c-4-6-10-14-10-28a48%2048%200%200%201%2048-48z%22%20fill%3D%22%23fff%22/%3E%3Cg%20fill%3D%22%231f6f5c%22%3E%3Crect%20x%3D%2273.5%22%20y%3D%2248%22%20width%3D%227%22%20height%3D%2228%22%20rx%3D%223.5%22/%3E%3Crect%20x%3D%2286.5%22%20y%3D%2248%22%20width%3D%227%22%20height%3D%2228%22%20rx%3D%223.5%22/%3E%3Crect%20x%3D%2299.5%22%20y%3D%2248%22%20width%3D%227%22%20height%3D%2228%22%20rx%3D%223.5%22/%3E%3Crect%20x%3D%2273.5%22%20y%3D%2270%22%20width%3D%2233%22%20height%3D%2212%22%20rx%3D%226%22/%3E%3Crect%20x%3D%2285%22%20y%3D%2278%22%20width%3D%2210%22%20height%3D%2234%22%20rx%3D%225%22/%3E%3C/g%3E%3C/svg%3E">
 <meta name="apple-mobile-web-app-title" content="Where to Eat">
 <title>Where to Eat</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -25,10 +31,12 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-header.top{padding:20px 16px 4px;max-width:720px;margin:0 auto}
-header.top h1{margin:0;font-size:26px;letter-spacing:-.02em}
-header.top p{margin:4px 0 0;color:var(--muted);font-size:15px}
-main{max-width:720px;margin:0 auto;padding:12px 16px 40px;display:grid;gap:14px}
+header.top{padding:22px 16px 4px;max-width:720px;margin:0 auto;display:flex;gap:12px;align-items:center}
+header.top .logo{width:44px;height:44px;flex:none}
+header.top .logo svg{width:100%;height:100%;display:block;border-radius:11px}
+header.top h1{margin:0;font-size:26px;letter-spacing:-.02em;line-height:1.1}
+header.top p{margin:3px 0 0;color:var(--muted);font-size:15px}
+main{max-width:720px;margin:0 auto;padding:12px 16px 40px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
 .panel h2{margin:0 0 10px;font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .panel h3.sub{margin:14px 0 6px;font-size:14px;color:var(--muted);font-weight:600}
@@ -81,7 +89,6 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .badge.gem{background:#fff1c9;color:#7a5200}
 .badge.award{background:#fde2e2;color:#9b1c1c}
 @media (prefers-color-scheme: dark){ .badge.gem{background:#3d3214;color:#f3d27a} .badge.award{background:#401c1c;color:#f5a3a3} }
-.whyrank{font-size:13px;color:var(--muted);margin-top:6px}
 .sortrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .sortrow span{font-weight:600;font-size:14px;color:var(--muted)}
 .card .head{display:flex;gap:10px;align-items:flex-start}
@@ -106,15 +113,37 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12.5px}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.setup{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+#btnSearch{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom));z-index:500;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+details.avoid > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.avoid > summary::-webkit-details-marker{display:none}
+details.avoid > summary h2{margin:0}
+details.avoid > summary .count{font-size:13px;font-weight:600;color:var(--muted);margin-left:auto}
+details.avoid > summary .count.on{color:var(--bad)}
+details.avoid > summary::after{content:"\25BE";color:var(--muted);font-size:14px;transition:transform .15s}
+details.avoid[open] > summary::after{transform:rotate(180deg)}
+details.avoid[open] > summary{margin-bottom:10px}
+#results:not(.has) .after{display:none}
+.score.hi{background:var(--accent);color:var(--accent-ink)}
+.score.lo{background:var(--warn-bg);color:var(--muted)}
+details.whyrank{font-size:13px;color:var(--muted);margin-top:6px}
+details.whyrank summary{cursor:pointer;font-weight:600;color:var(--accent);width:max-content}
+details.whyrank p{margin:4px 0 0}
+.stale-note{display:inline-block;margin-top:4px;color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
 <header class="top">
-  <h1>Where to Eat</h1>
-  <p>Set your spot, filter, and skip the food you don't want.</p>
+  <div class="logo"><svg viewBox="0 0 180 180" aria-hidden="true"><rect width="180" height="180" rx="40" fill="#1f6f5c"/><path d="M90 30a48 48 0 0 1 48 48c0 14-6 22-10 28L90 156 52 106c-4-6-10-14-10-28a48 48 0 0 1 48-48z" fill="#fff"/><g fill="#1f6f5c"><rect x="73.5" y="48" width="7" height="28" rx="3.5"/><rect x="86.5" y="48" width="7" height="28" rx="3.5"/><rect x="99.5" y="48" width="7" height="28" rx="3.5"/><rect x="73.5" y="70" width="33" height="12" rx="6"/><rect x="85" y="78" width="10" height="34" rx="5"/></g></svg></div>
+  <div>
+    <h1>Where to Eat</h1>
+    <p>Good local food nearby, minus the chains and what you don't want.</p>
+  </div>
 </header>
 
 <main>
+  <div class="setup">
   <section class="panel">
     <h2>1 &middot; Where are you?</h2>
     <div class="loc-actions">
@@ -122,7 +151,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
       <button class="btn ghost" id="btnPin" type="button">Drop a pin on the map</button>
     </div>
     <form class="addr" id="addrForm">
-      <input id="addr" type="search" placeholder="Or type an address, city, or ZIP" enterkeyhint="search" aria-label="Address, city, or ZIP">
+      <input id="addr" type="search" placeholder="Address, city, or ZIP" enterkeyhint="search" aria-label="Address, city, or ZIP">
       <button class="btn ghost" type="submit">Go</button>
     </form>
     <ul class="addr-results" id="addrResults"></ul>
@@ -137,7 +166,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
     </div>
     <div class="field">
       <span class="t">Max price</span>
-      <div class="chips" id="priceChips" role="radiogroup" aria-label="Max price">
+      <div class="chips" id="priceChips" role="group" aria-label="Max price">
         <button class="chip" type="button" data-price="0" aria-pressed="true">Any</button>
         <button class="chip" type="button" data-price="1" aria-pressed="false">$</button>
         <button class="chip" type="button" data-price="2" aria-pressed="false">$$</button>
@@ -165,7 +194,8 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
   </section>
 
   <section class="panel">
-    <h2>3 &middot; Food to avoid</h2>
+    <details class="avoid" id="avoidBox">
+    <summary><h2>3 &middot; Food to avoid</h2><span class="count" id="avoidCount">None</span></summary>
     <h3 class="sub" style="margin-top:0">Cuisines</h3>
     <div class="chips" id="exCuisine"></div>
     <h3 class="sub">Ingredients &amp; diet (best effort)</h3>
@@ -177,18 +207,22 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
     </form>
     <div class="chips" id="kwChips" style="margin-top:8px"></div>
     <p class="note">Map data has no menus. Exclusions match cuisine tags and names, so a place can slip through. Don't rely on this for allergies.</p>
+    </details>
   </section>
 
   <button class="btn primary big" id="btnSearch" type="button">Find restaurants</button>
+  </div>
 
   <section class="panel" id="results">
     <h2>Results</h2>
+    <div class="after">
     <div class="pickrow"><button class="btn" id="btnPick" type="button" style="width:100%">Pick one for me</button></div>
     <div class="sortrow" id="sortChips">
       <span>Sort:</span>
       <button class="chip" type="button" data-sort="best" aria-pressed="true">Best match</button>
       <button class="chip" type="button" data-sort="gems" aria-pressed="false">Hidden gems</button>
       <button class="chip" type="button" data-sort="near" aria-pressed="false">Nearest</button>
+    </div>
     </div>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" data-tab="list" aria-selected="true">List</button>
@@ -225,7 +259,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 10 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing, and closed places sometimes stay listed. Tap "Check status" before you go, and "Mark closed" to hide a place you know is gone.
+  Version 11 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing, and closed places sometimes stay listed. Tap "Check status" before you go, and "Mark closed" to hide a place you know is gone.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -483,6 +517,7 @@ $("#radius").addEventListener("input", e => {
   state.radiusMi = +e.target.value;
   $("#radiusVal").textContent = state.radiusMi + " mi";
   if (radiusCircle) radiusCircle.setRadius(state.radiusMi * MI);
+  refilter();
 });
 $("#priceChips").addEventListener("click", e => {
   const b = e.target.closest("button[data-price]"); if (!b) return;
@@ -501,6 +536,7 @@ $("#typeChecks").addEventListener("change", e => {
   const cb = e.target; if (!cb.matches("input")) return;
   if (cb.checked) state.types.add(cb.value); else state.types.delete(cb.value);
   if (!state.types.size){ state.types.add(cb.value); cb.checked = true; toast("Keep at least one place type selected."); }
+  refilter();
 });
 
 function buildExChips(){
@@ -516,23 +552,27 @@ document.addEventListener("click", e => {
   const id = b.dataset.ex;
   if (state.excluded.has(id)) state.excluded.delete(id); else state.excluded.add(id);
   b.setAttribute("aria-pressed", String(state.excluded.has(id)));
-  refilter();
+  updateAvoidCount(); refilter();
 });
 
+function updateAvoidCount(){
+  const n = state.excluded.size + state.keywords.length, el = $("#avoidCount");
+  el.textContent = n ? n + " selected" : "None"; el.classList.toggle("on", n > 0);
+}
 function renderKwChips(){
   $("#kwChips").innerHTML = state.keywords.map((k, i) =>
     `<button type="button" class="chip avoid" aria-pressed="true" data-kwdel="${i}" title="Remove">${esc(k)}</button>`).join("");
 }
 $("#kwChips").addEventListener("click", e => {
   const b = e.target.closest("button[data-kwdel]"); if (!b) return;
-  state.keywords.splice(+b.dataset.kwdel, 1); renderKwChips(); refilter();
+  state.keywords.splice(+b.dataset.kwdel, 1); renderKwChips(); updateAvoidCount(); refilter();
 });
 $("#kwForm").addEventListener("submit", e => {
   e.preventDefault();
   const v = $("#kwInput").value.trim().slice(0, 40);
   if (!v) return;
   if (!state.keywords.some(k => k.toLowerCase() === v.toLowerCase())) state.keywords.push(v);
-  $("#kwInput").value = ""; renderKwChips(); refilter();
+  $("#kwInput").value = ""; renderKwChips(); updateAvoidCount(); refilter();
 });
 
 /* ---------- matching ---------- */
@@ -726,7 +766,7 @@ function fitToRadius(){
 
 async function runSearch(){
   if (searchCtl){ searchCtl.abort(); return; }            // second tap = cancel
-  wideGen++; state.chainChecking = false;
+  wideGen++; state.chainChecking = false; chainCheckPending = false;
   if (!state.center){ toast("Set a location first."); $("#locLabel").scrollIntoView({behavior:"smooth", block:"center"}); return; }
   const btn = $("#btnSearch");
   searchCtl = new AbortController();
@@ -771,7 +811,9 @@ async function runSearch(){
   }
 
   if (!json){
-    state.places = [];
+    state.places = []; state.visible = []; state.hidden = []; state.bag = []; state.searched = false;
+    $("#results").classList.remove("has");
+    placeLayer.clearLayers(); markers.clear();
     st.innerHTML = errMsg === "cancelled"
       ? 'Search cancelled. <button class="link" type="button" id="retry">Search again</button>'
       : `Couldn't reach any restaurant data server. <button class="link" type="button" id="retry">Try again</button>`
@@ -784,11 +826,15 @@ async function runSearch(){
     const seen = new Set();
     state.places = (json.elements || []).map(el => toPlace(el, center))
       .filter(p => p && p.dist <= state.radiusMi * 1.02 && !seen.has(p.id) && seen.add(p.id));
+    state.places = mergeDuplicates(state.places);
     for (const el of addedEls){
       const pl = toPlace(el, center);
-      if (pl && pl.dist <= state.radiusMi * 1.02 && !seen.has(pl.id)){ seen.add(pl.id); pl.manual = true; state.places.push(pl); }
+      if (pl && pl.dist <= state.radiusMi * 1.02 && !seen.has(pl.id) && !state.places.some(p => isSamePlace(p, pl))){
+        seen.add(pl.id); pl.manual = true; state.places.push(pl);
+      }
     }
     state.searched = true; state.bag = [];
+    state.searchedRadius = state.radiusMi; state.searchedTypes = [...state.types].sort().join(",");
     render();
     if (source === "backup") st.innerHTML += '<br><small>Used the backup source (up to 40 places per type), since the main servers were busy.</small>';
     checkTopForChains();
@@ -801,6 +847,21 @@ async function runSearch(){
 }
 $("#btnSearch").addEventListener("click", runSearch);
 document.addEventListener("click", e => { if (e.target.id === "retry") runSearch(); });
+
+/* One restaurant is often mapped twice (a point and a building outline with the same name). Keep the richer entry. */
+function isSamePlace(a, b){
+  return chainKey(a.name) === chainKey(b.name) && haversineMi(a.lat, a.lon, b.lat, b.lon) < 0.06;
+}
+function richness(p){ return [p.hours, p.site, p.phone, p.addr, p.price, p.cuisines.length, p.diet.length, p.michelin, p.brandQid].filter(Boolean).length; }
+function mergeDuplicates(list){
+  const out = [];
+  for (const p of list){
+    const i = out.findIndex(q => isSamePlace(q, p));
+    if (i < 0) out.push(p);
+    else if (richness(p) > richness(out[i])) out[i] = p;
+  }
+  return out;
+}
 
 /* ---------- rendering ---------- */
 function directionsUrl(p){
@@ -894,23 +955,29 @@ function overpassRe(name){
   const re = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return re.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
+// Exact name, optional leading "The", optional location suffix like " - Towson", " (Towson)", ": Towson", " @ Mall".
+function nameRe(name){ return "^(the )?" + overpassRe(name) + "( *[-:@|(].*| +\u2013 .*| +\u2014 .*)?$"; }
+
+let chainCheckPending = false;
 async function checkTopForChains(){
   if (!state.searched || !state.center) return;
-  const gen = ++wideGen;
+  if (state.chainChecking){ chainCheckPending = true; return; }   // run again when the current check finishes
   const pool = (state.sort === "near" ? [...state.visible].sort((a, b) => b.rank - a.rank) : state.visible)
     .filter(p => !p.chainScope && !wideCounts.has(chainKey(p.name)) && chainKey(p.name).length >= 4);
   const picks = []; const keys = new Set();
   for (const p of pool){ const k = chainKey(p.name); if (!keys.has(k)){ keys.add(k); picks.push(p); } if (picks.length >= 8) break; }
   if (!picks.length) return;
+  const gen = ++wideGen;
   const {lat, lon} = state.center;
   const q = "[out:json][timeout:20];" + picks.map(p =>
-    `nw["amenity"]["name"~"^(the )?${overpassRe(p.name)}",i](around:80000,${lat},${lon});out count;nw["shop"~"^(deli|bakery)$"]["name"~"^(the )?${overpassRe(p.name)}",i](around:80000,${lat},${lon});out count;`).join("");
+    `nw["amenity"]["name"~"${nameRe(p.name)}",i](around:80000,${lat},${lon});out count;nw["shop"~"^(deli|bakery)$"]["name"~"${nameRe(p.name)}",i](around:80000,${lat},${lon});out count;`).join("");
   state.chainChecking = true; render();
   let json = null;
   try{ json = await overpass(q, new AbortController().signal, () => {}); }catch(_){}
-  if (gen !== wideGen) return;            // a newer search started
+  if (gen !== wideGen) return;            // a newer search started (it reset chainChecking)
   state.chainChecking = false;
-  if (!json){ render(); return; }
+  const again = () => { if (chainCheckPending){ chainCheckPending = false; checkTopForChains(); } };
+  if (!json){ render(); again(); return; }
   const counts = (json.elements || []).filter(e => e.type === "count");
   let found = 0;
   picks.forEach((p, i) => {
@@ -920,6 +987,7 @@ async function checkTopForChains(){
   });
   render();
   if (found) toast(`Found ${found} chain${found === 1 ? "" : "s"} in your top picks and moved ${found === 1 ? "it" : "them"} down.`);
+  again();
 }
 
 function scorePlaces(list){
@@ -946,7 +1014,7 @@ function scorePlaces(list){
     else if (p.brand && chainKey(p.brand) !== key){ scope = "group"; how = "part of a brand"; }
     else if (p.siteHost && hostCounts[p.siteHost] >= 2){ scope = "group"; how = "shares a website with another listing"; }
     else if (/\/locations?\//.test(p.sitePath)){ scope = "group"; how = "website lists multiple locations"; }
-    else if (nameCounts[key] === 2 || wide === 2){ scope = "group"; how = "2 locations"; }
+    else if (nameCounts[key] === 2){ scope = "group"; how = "2 locations"; }
     p.chainScope = scope; p.chain = scope === "national" || scope === "regional";
 
     const m = MICHELIN[p.michelin];
@@ -1022,10 +1090,10 @@ function reviewsUrl(p){
 function cardHTML(p, opts){
   opts = opts || {};
   const open = p.open === true ? '<span class="badge ok">Open now</span>'
-             : p.open === false ? '<span class="badge bad">Closed now</span>'
-             : '<span class="badge">Hours unknown</span>';
-  const price = p.price ? `<span class="badge">${"$".repeat(p.price.level)}${p.price.est ? " (est.)" : ""}</span>` : '<span class="badge">Price unknown</span>';
-  const cu = p.cuisines.length ? "" : '<span class="badge">Cuisine unknown</span>';
+             : p.open === false ? '<span class="badge bad">Closed now</span>' : "";
+  const price = p.price ? `<span class="badge">${"$".repeat(p.price.level)}${p.price.est ? " (est.)" : ""}</span>` : "";
+  const unknown = [!p.hours && "hours", !p.price && "price", !p.cuisines.length && "cuisine"].filter(Boolean);
+  const cu = unknown.length ? `<span class="badge">Unknown: ${unknown.join(", ")}</span>` : "";
   const diet = p.diet.map(d => `<span class="badge diet">${esc(d)}</span>`).join("");
   const meta = [p.cuisineLabel, p.addr].filter(Boolean).join(" \u00B7 ");
   const acts = [
@@ -1044,15 +1112,15 @@ function cardHTML(p, opts){
   const chainB = p.chain ? `<span class="badge bad">${p.chainScope === "national" ? "National chain" : "Regional chain"}</span>` : "";
   return `<article class="card${opts.dim ? " dim" : ""}">
     <div class="head">
-      <div class="score" title="Ranking score">${displayScore(p)}<small>SCORE</small></div>
+      <div class="score ${displayScore(p) >= 70 ? "hi" : displayScore(p) >= 45 ? "" : "lo"}" title="Ranking score">${displayScore(p)}<small>SCORE</small></div>
       <div class="grow">
         <div class="row"><h3>${esc(p.name)}</h3><span class="dist">${fmtDist(p.dist)}</span></div>
         ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
       </div>
     </div>
     <div class="badges">${p.manual ? '<span class="badge diet">Added by you</span>' : ""}${award}${gem}${chainB}${stale}${open}${price}${cu}${diet}</div>
-    ${p.whyAll ? `<div class="whyrank">Score: ${esc(p.whyAll.join(", "))}</div>` : ""}
-    ${p.hours && p.open !== null ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
+    ${p.whyAll ? `<details class="whyrank"><summary>Why this score</summary><p>${esc(p.whyAll.join(", "))}</p></details>` : ""}
+    ${p.hours ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
     <div class="actions">${acts}</div>
     ${opts.dim && p.reasons.length ? `<div class="why">${esc(p.reasons.join("; "))}</div>` : ""}
   </article>`;
@@ -1065,6 +1133,7 @@ function render(){
   for (const p of state.places){
     p.open = openStatus(p.hours, now);
     p.reasons = evaluate(p);
+    if (p.dist > state.radiusMi * 1.02 && !p.reasons.length) p.reasons.push("Farther than your distance");
     (p.reasons.length ? hid : vis).push(p);
   }
   const mode = state.sort;
@@ -1074,11 +1143,13 @@ function render(){
   state.visible = vis; state.hidden = hid;
   state.bag = state.bag.filter(id => vis.some(p => p.id === id));
 
+  $("#results").classList.toggle("has", state.places.length > 0);
   const st = $("#status");
   if (!state.places.length){
     st.textContent = "Nothing found here. Try a bigger distance or more place types.";
   } else {
-    let s = `${vis.length} place${vis.length === 1 ? "" : "s"} within ${state.radiusMi} mi, ${mode === "near" ? "nearest first" : mode === "gems" ? "independent local spots first" : "best match first"}.`;
+    let s = `${vis.length} place${vis.length === 1 ? "" : "s"} within ${Math.min(state.radiusMi, state.searchedRadius || state.radiusMi)} mi, ${mode === "near" ? "nearest first" : mode === "gems" ? "independent local spots first" : "best match first"}.`;
+    if (searchIsStale()) s += ' <br><strong class="stale-note">Filters changed. <button class="link" type="button" id="retry">Search again</button> to include more places.</strong>';
     if (state.chainChecking) s += ' <br><small><span class="spin"></span>Checking top picks for chain locations nearby...</small>';
     if (hid.length) s += ` ${hid.length} hidden by your filters. <button class="link" type="button" id="toggleHidden">${state.showHidden ? "Hide them" : "Show them"}</button>`;
     st.innerHTML = s;
@@ -1096,6 +1167,11 @@ function render(){
   }
 }
 function refilter(){ if (state.searched) render(); }
+// True when the last search didn't cover the current settings (bigger distance or different place types).
+function searchIsStale(){
+  if (!state.searched) return false;
+  return state.radiusMi > (state.searchedRadius || 0) + 1e-9 || [...state.types].sort().join(",") !== state.searchedTypes;
+}
 
 document.addEventListener("click", e => {
   if (e.target.id === "toggleHidden"){ state.showHidden = !state.showHidden; render(); return; }
@@ -1148,6 +1224,7 @@ function showPick(){
   if (!p){ toast("No places match your filters right now."); return; }
   $("#sheetCard").innerHTML = cardHTML(p);
   $("#sheet").hidden = false;
+  $("#sheetNext").focus({preventScroll:true});
 }
 function closeSheet(){ $("#sheet").hidden = true; }
 $("#btnPick").addEventListener("click", showPick);
@@ -1222,6 +1299,7 @@ $("#findResults").addEventListener("click", e => {
   state.userClosed.delete(String(pl.id)); saveClosed();
   if (!state.places.some(p => p.id === pl.id)){ pl.manual = true; state.places.push(pl); }
   state.searched = true; state.bag = [];
+  if (state.searchedTypes === undefined){ state.searchedRadius = state.radiusMi; state.searchedTypes = [...state.types].sort().join(","); }
   render();
   b.textContent = "Added"; b.disabled = true;
   toast(pl.name + " added to your results.");
