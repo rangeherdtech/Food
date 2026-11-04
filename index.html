@@ -201,6 +201,15 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
       <div id="map"></div>
     </div>
   </section>
+  <section class="panel" id="findPanel">
+    <h2>Can't find a place?</h2>
+    <form class="kw" id="findForm">
+      <input id="findInput" type="search" placeholder="Restaurant name, e.g. Mikey &amp; Mel's" enterkeyhint="search" aria-label="Restaurant name">
+      <button class="btn ghost" type="submit">Look up</button>
+    </form>
+    <div class="cards" id="findResults" style="margin-top:10px"></div>
+    <p class="note">Looks up the name near your spot in the map data and shows how it's recorded. You can add it to your results, and it stays added on this phone.</p>
+  </section>
 </main>
 
 <div class="sheet" id="sheet" hidden>
@@ -216,7 +225,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 8 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing, and closed places sometimes stay listed. Tap "Check status" before you go.
+  Version 10 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing, and closed places sometimes stay listed. Tap "Check status" before you go, and "Mark closed" to hide a place you know is gone.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -326,13 +335,39 @@ function openStatus(str, now){
 }
 // </hours>
 
+/* ---------- places you've marked closed (saved on this device only) ---------- */
+const CLOSED_KEY = "wte_closed_v1";
+let closedMemory = [];                       // fallback if the browser blocks storage
+function loadClosed(){
+  try{ const a = JSON.parse(localStorage.getItem(CLOSED_KEY) || "[]"); if (Array.isArray(a)) return new Set(a.map(String)); }catch(_){}
+  return new Set(closedMemory);
+}
+function saveClosed(){
+  closedMemory = [...state.userClosed];
+  try{ localStorage.setItem(CLOSED_KEY, JSON.stringify(closedMemory)); }catch(_){}
+}
+
+/* ---------- places you've added by name (saved on this device only) ---------- */
+const ADDED_KEY = "wte_added_v1";
+let addedMemory = [];
+function loadAdded(){
+  try{ const a = JSON.parse(localStorage.getItem(ADDED_KEY) || "[]"); if (Array.isArray(a)) return a.filter(x => x && x.id && x.tags); }catch(_){}
+  return addedMemory.slice();
+}
+let addedEls = loadAdded();
+function saveAdded(){
+  addedEls = addedEls.slice(-50);
+  addedMemory = addedEls.slice();
+  try{ localStorage.setItem(ADDED_KEY, JSON.stringify(addedEls)); }catch(_){}
+}
+
 /* ---------- state ---------- */
 const state = {
   center: null, label: "", radiusMi: 2, maxPrice: 0, openNow: false,
   types: new Set(["restaurant","fast_food","shop:deli"]),
   excluded: new Set(), keywords: [],
   places: [], visible: [], searched: false, showHidden: false,
-  pinMode: false, bag: [], currentPick: null, sort: "best"
+  pinMode: false, bag: [], currentPick: null, sort: "best", userClosed: loadClosed()
 };
 
 /* ---------- map ---------- */
@@ -528,6 +563,8 @@ function exclusionHits(p){
 }
 function evaluate(p){
   const reasons = [];
+  p.userClosed = state.userClosed.has(String(p.id));
+  if (p.userClosed) reasons.push("You marked this closed");
   if (p.closedWhy) reasons.push("Looks closed: " + p.closedWhy);
   const hits = exclusionHits(p);
   if (hits.length) reasons.push("Avoiding: " + hits.join(", "));
@@ -747,6 +784,10 @@ async function runSearch(){
     const seen = new Set();
     state.places = (json.elements || []).map(el => toPlace(el, center))
       .filter(p => p && p.dist <= state.radiusMi * 1.02 && !seen.has(p.id) && seen.add(p.id));
+    for (const el of addedEls){
+      const pl = toPlace(el, center);
+      if (pl && pl.dist <= state.radiusMi * 1.02 && !seen.has(pl.id)){ seen.add(pl.id); pl.manual = true; state.places.push(pl); }
+    }
     state.searched = true; state.bag = [];
     render();
     if (source === "backup") st.innerHTML += '<br><small>Used the backup source (up to 40 places per type), since the main servers were busy.</small>';
@@ -992,7 +1033,9 @@ function cardHTML(p, opts){
     opts.noMapBtn ? "" : `<button type="button" data-act="map" data-id="${esc(p.id)}">Map</button>`,
     p.phone ? `<a href="tel:${esc(p.phone)}">Call</a>` : "",
     p.site ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">Website</a>` : "",
-    `<a href="${esc(reviewsUrl(p))}" target="_blank" rel="noopener">Check status</a>`
+    `<a href="${esc(reviewsUrl(p))}" target="_blank" rel="noopener">Check status</a>`,
+    p.userClosed ? `<button type="button" data-act="reopen" data-id="${esc(p.id)}">Undo closed</button>`
+                 : `<button type="button" data-act="closed" data-id="${esc(p.id)}">Mark closed</button>`
   ].join("");
   const award = p.award ? `<span class="badge award">${esc(p.award)}</span>` : "";
   const gem = p.gem ? '<span class="badge gem">Hidden gem pick</span>' : "";
@@ -1007,7 +1050,7 @@ function cardHTML(p, opts){
         ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
       </div>
     </div>
-    <div class="badges">${award}${gem}${chainB}${stale}${open}${price}${cu}${diet}</div>
+    <div class="badges">${p.manual ? '<span class="badge diet">Added by you</span>' : ""}${award}${gem}${chainB}${stale}${open}${price}${cu}${diet}</div>
     ${p.whyAll ? `<div class="whyrank">Score: ${esc(p.whyAll.join(", "))}</div>` : ""}
     ${p.hours && p.open !== null ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
     <div class="actions">${acts}</div>
@@ -1066,6 +1109,20 @@ document.addEventListener("click", e => {
   }, 120);
 });
 
+document.addEventListener("click", e => {
+  const b = e.target.closest('button[data-act="closed"], button[data-act="reopen"]'); if (!b) return;
+  const id = String(b.dataset.id), p = state.places.find(x => String(x.id) === id);
+  if (b.dataset.act === "closed"){
+    state.userClosed.add(id); saveClosed();
+    toast((p ? p.name : "Place") + " hidden. Find it under \u201CShow them\u201D to undo.");
+  } else {
+    state.userClosed.delete(id); saveClosed();
+    toast((p ? p.name : "Place") + " is back in your results.");
+  }
+  if (!$("#sheet").hidden) closeSheet();
+  state.bag = []; render();
+});
+
 /* ---------- pick for me ---------- */
 function nextPick(){
   const vis = state.visible;
@@ -1098,6 +1155,77 @@ $("#sheetNext").addEventListener("click", showPick);
 $("#sheetClose").addEventListener("click", closeSheet);
 $("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeSheet(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+/* ---------- look a place up by name ---------- */
+let foundList = [];
+async function nominatimByName(q){
+  const {lat, lon} = state.center, dLat = 0.4, dLon = 0.4 / Math.cos(lat * Math.PI / 180);
+  const vb = [lon - dLon, lat + dLat, lon + dLon, lat - dLat].map(n => n.toFixed(5)).join(",");
+  const terms = [...new Set([q, q.replace(/&/g, " and ").replace(/\s+/g, " ").trim(), q.replace(/&/g, " ").replace(/['’]s?\b/g, "").replace(/\s+/g, " ").trim()])];
+  for (const [i, term] of terms.entries()){
+    if (i) await new Promise(r => setTimeout(r, 1100));
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&bounded=1&extratags=1&addressdetails=1&viewbox=" + vb + "&q=" + encodeURIComponent(term));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const arr = await r.json();
+    if (arr.length) return arr;
+  }
+  return [];
+}
+$("#findForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const q = $("#findInput").value.trim(); if (!q) return;
+  if (!state.center){ toast("Set a location first."); return; }
+  const box = $("#findResults");
+  box.innerHTML = '<p class="status"><span class="spin"></span>Looking in the map data...</p>';
+  try{
+    const arr = await nominatimByName(q);
+    const {lat, lon} = state.center;
+    if (!arr.length){
+      foundList = [];
+      box.innerHTML = `<div class="empty">Nothing with that name within about 28 miles in the map data, so no search can find it yet. `
+        + `<a href="https://www.openstreetmap.org/note/new#map=18/${lat.toFixed(5)}/${lon.toFixed(5)}" target="_blank" rel="noopener">Tell OpenStreetMap it's missing</a></div>`;
+      return;
+    }
+    foundList = arr;
+    box.innerHTML = arr.map((d, i) => {
+      const tag = d.category + "=" + d.type;
+      const addable = d.category === "amenity" || d.category === "shop";
+      const searched = state.types.has(d.type) || state.types.has("shop:" + d.type) || (d.type === "bar" || d.type === "pub") && state.types.has("bar|pub");
+      const note = !addable ? "Not a food or shop listing in the map data."
+        : searched ? "This type is searched, so it should have shown up unless filtered, hidden or missed by a busy server."
+        : "This type isn't one the app searches, which is why it didn't show.";
+      const nm = d.name || (d.display_name || "").split(",")[0];
+      const dist = haversineMi(lat, lon, +d.lat, +d.lon);
+      const addr = [d.address && [d.address.house_number, d.address.road].filter(Boolean).join(" "), d.address && (d.address.city || d.address.town || d.address.village || d.address.suburb)].filter(Boolean).join(", ");
+      return `<article class="card"><div class="row"><h3>${esc(nm)}</h3><span class="dist">${fmtDist(dist)}</span></div>
+        ${addr ? `<div class="meta">${esc(addr)}</div>` : ""}
+        <div class="badges"><span class="badge">Recorded as ${esc(tag)}</span></div>
+        <div class="meta">${esc(note)}</div>
+        <div class="actions">${addable ? `<button type="button" data-find="${i}">Add to results</button>` : ""}
+        <a href="https://www.openstreetmap.org/${esc(d.osm_type)}/${esc(d.osm_id)}" target="_blank" rel="noopener">View entry</a></div></article>`;
+    }).join("");
+  }catch(err){
+    box.innerHTML = '<div class="empty">Couldn’t reach the lookup service. Try again in a moment.</div>';
+  }
+});
+$("#findResults").addEventListener("click", e => {
+  const b = e.target.closest("button[data-find]"); if (!b) return;
+  const d = foundList[+b.dataset.find]; if (!d || !state.center) return;
+  const a = d.address || {};
+  const el = {type: d.osm_type, id: d.osm_id, lat: +d.lat, lon: +d.lon, tags: Object.assign({}, d.extratags || {}, {
+    [d.category]: d.type, name: d.name || (d.display_name || "").split(",")[0],
+    "addr:housenumber": a.house_number, "addr:street": a.road, "addr:city": a.city || a.town || a.village || a.suburb
+  })};
+  const pl = toPlace(el, state.center);
+  if (!pl){ toast("That entry has no usable location."); return; }
+  if (!addedEls.some(x => x.type + x.id === pl.id)){ addedEls.push(el); saveAdded(); }
+  state.userClosed.delete(String(pl.id)); saveClosed();
+  if (!state.places.some(p => p.id === pl.id)){ pl.manual = true; state.places.push(pl); }
+  state.searched = true; state.bag = [];
+  render();
+  b.textContent = "Added"; b.disabled = true;
+  toast(pl.name + " added to your results.");
+});
 </script>
 </body>
 </html>
