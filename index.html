@@ -76,6 +76,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .badge.ok{background:var(--ok-bg);color:var(--ok)}
 .badge.bad{background:var(--bad-bg);color:var(--bad)}
 .badge.diet{background:var(--accent-soft);color:var(--accent)}
+.score{flex:none;min-width:44px;text-align:center;font-weight:700;font-size:15px;border-radius:10px;padding:4px 6px;background:var(--accent-soft);color:var(--accent)}
+.score small{display:block;font-size:10px;font-weight:600;opacity:.8;letter-spacing:.04em}
+.badge.gem{background:#fff1c9;color:#7a5200}
+.badge.award{background:#fde2e2;color:#9b1c1c}
+@media (prefers-color-scheme: dark){ .badge.gem{background:#3d3214;color:#f3d27a} .badge.award{background:#401c1c;color:#f5a3a3} }
+.whyrank{font-size:13px;color:var(--muted);margin-top:6px}
+.sortrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.sortrow span{font-weight:600;font-size:14px;color:var(--muted)}
+.card .head{display:flex;gap:10px;align-items:flex-start}
+.card .head .grow{flex:1;min-width:0}
 .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .actions a,.actions button{font:inherit;font-size:14px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);background:var(--card);
   padding:7px 12px;border-radius:10px;cursor:pointer;min-height:38px;display:inline-flex;align-items:center}
@@ -123,7 +133,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
     <h2>2 &middot; Search filters</h2>
     <div class="field">
       <label class="t" for="radius"><span>Distance</span><span id="radiusVal">2 mi</span></label>
-      <input id="radius" type="range" min="0.5" max="10" step="0.5" value="2">
+      <input id="radius" type="range" min="0.5" max="50" step="0.5" value="2">
     </div>
     <div class="field">
       <span class="t">Max price</span>
@@ -171,6 +181,12 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
   <section class="panel" id="results">
     <h2>Results</h2>
     <div class="pickrow"><button class="btn" id="btnPick" type="button" style="width:100%">Pick one for me</button></div>
+    <div class="sortrow" id="sortChips">
+      <span>Sort:</span>
+      <button class="chip" type="button" data-sort="best" aria-pressed="true">Best match</button>
+      <button class="chip" type="button" data-sort="gems" aria-pressed="false">Hidden gems</button>
+      <button class="chip" type="button" data-sort="near" aria-pressed="false">Nearest</button>
+    </div>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" data-tab="list" aria-selected="true">List</button>
       <button type="button" role="tab" data-tab="map" aria-selected="false">Map</button>
@@ -197,7 +213,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 3 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  Version 5 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -313,7 +329,7 @@ const state = {
   types: new Set(["restaurant","fast_food"]),
   excluded: new Set(), keywords: [],
   places: [], visible: [], searched: false, showHidden: false,
-  pinMode: false, bag: [], currentPick: null
+  pinMode: false, bag: [], currentPick: null, sort: "best"
 };
 
 /* ---------- map ---------- */
@@ -333,7 +349,7 @@ const placeLayer = L.layerGroup().addTo(map);
 let meMarker = null, radiusCircle = null;
 const markers = new Map();
 
-function zoomFor(mi){ return mi <= .75 ? 15 : mi <= 1.5 ? 14 : mi <= 3 ? 13 : mi <= 6 ? 12 : 11; }
+function zoomFor(mi){ return mi <= .75 ? 15 : mi <= 1.5 ? 14 : mi <= 3 ? 13 : mi <= 6 ? 12 : mi <= 12 ? 11 : mi <= 25 ? 10 : 9; }
 
 function setCenter(lat, lon, label, opts){
   opts = opts || {};
@@ -434,6 +450,12 @@ $("#priceChips").addEventListener("click", e => {
   const b = e.target.closest("button[data-price]"); if (!b) return;
   state.maxPrice = +b.dataset.price;
   document.querySelectorAll("#priceChips .chip").forEach(c => c.setAttribute("aria-pressed", String(c === b)));
+  refilter();
+});
+$("#sortChips").addEventListener("click", e => {
+  const b = e.target.closest("button[data-sort]"); if (!b) return;
+  state.sort = b.dataset.sort; state.bag = [];
+  document.querySelectorAll("#sortChips .chip").forEach(c => c.setAttribute("aria-pressed", String(c === b)));
   refilter();
 });
 $("#openNow").addEventListener("change", e => { state.openNow = e.target.checked; refilter(); });
@@ -540,7 +562,11 @@ function toPlace(el, center){
     amenity: t.amenity, cuisines, cuisineSet: new Set(cuisines),
     cuisineLabel: cuisineText.map(title).join(", "),
     hay: norm([t.name, t.brand, t.description, cuisineText.join(" ")].filter(Boolean).join(" ")),
-    hours: t.opening_hours || "", price: parsePrice(t), addr, diet, site, phone
+    hours: t.opening_hours || "", price: parsePrice(t), addr, diet, site, phone,
+    brand: t.brand || "", brandQid: t["brand:wikidata"] || "",
+    notable: !!(t.wikipedia || t.wikidata) && !t["brand:wikidata"],
+    michelin: String(t["award:michelin"] || t["michelin"] || "").toLowerCase().trim(),
+    city: t["addr:city"] || ""
   };
 }
 
@@ -550,7 +576,8 @@ const ENDPOINTS = [
   "https://overpass.private.coffee/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
 ];
-const OVERPASS_TIMEOUT_MS = 15000;
+// Bigger areas get more time and a higher result cap.
+const overpassTimeoutMs = mi => mi > 10 ? 25000 : 15000;
 let searchCtl = null;
 
 function firstSuccess(promises){
@@ -568,7 +595,7 @@ function overpass(q, outerSignal, report){
   const ctls = ENDPOINTS.map(() => new AbortController());
   const abortAll = () => ctls.forEach(c => c.abort());
   outerSignal.addEventListener("abort", abortAll, {once:true});
-  const timer = setTimeout(abortAll, OVERPASS_TIMEOUT_MS);
+  const timer = setTimeout(abortAll, overpassTimeoutMs(state.radiusMi));
   const tries = ENDPOINTS.map(async (url, i) => {
     try{
       const r = await fetch(url + "?data=" + encodeURIComponent(q), {signal: ctls[i].signal});
@@ -644,7 +671,7 @@ async function runSearch(){
   const center = {lat, lon};
   const R = Math.round(state.radiusMi * MI);
   const typeList = [...state.types];
-  const q = `[out:json][timeout:15];nw["amenity"~"^(${typeList.join("|")})$"]["name"](around:${R},${lat},${lon});out center 400;`;
+  const q = `[out:json][timeout:${overpassTimeoutMs(state.radiusMi) / 1000}];nw["amenity"~"^(${typeList.join("|")})$"]["name"](around:${R},${lat},${lon});out center ${state.radiusMi > 10 ? 1500 : 400};`;
 
   const problems = [];
   const report = m => problems.push(m);
@@ -701,6 +728,78 @@ function directionsUrl(p){
 }
 const fmtDist = d => d < 0.1 ? "<0.1 mi" : d.toFixed(1) + " mi";
 
+/* ---------- ranking ----------
+   OpenStreetMap has no star ratings, so this scores each place on signals that tend to go with good food:
+   awards, independence (not a chain), notability, a specific cuisine, sit-down service, and a well-kept listing.
+   Every point is explained on the card. Scores are relative to this search, not absolute. */
+const CHAINS = new Set(["mcdonald s","burger king","wendy s","subway","taco bell","kfc","chick fil a","popeyes","arby s","sonic","sonic drive in",
+  "dairy queen","jack in the box","carl s jr","hardee s","five guys","shake shack","in n out burger","whataburger","culver s","checkers","rally s",
+  "white castle","wingstop","buffalo wild wings","domino s","domino s pizza","pizza hut","papa john s","little caesars","papa murphy s","marco s pizza",
+  "chipotle","chipotle mexican grill","qdoba","moe s southwest grill","panda express","p f chang s","starbucks","dunkin","dunkin donuts","tim hortons",
+  "panera bread","jersey mike s","jimmy john s","firehouse subs","potbelly","jason s deli","olive garden","red lobster","applebee s","chili s",
+  "tgi fridays","outback steakhouse","longhorn steakhouse","texas roadhouse","cracker barrel","denny s","ihop","waffle house","bob evans",
+  "red robin","ruby tuesday","cheesecake factory","the cheesecake factory","bj s restaurant brewhouse","hooters","golden corral","perkins",
+  "zaxby s","raising cane s","bojangles","church s chicken","el pollo loco","del taco","cook out","steak n shake","krystal","bob evans",
+  "noodles company","sweetgreen","cava","tropical smoothie cafe","smoothie king","jamba","boston market","long john silver s","captain d s",
+  "cinnabon","auntie anne s","baskin robbins","cold stone creamery","krispy kreme","einstein bros bagels","mod pizza","blaze pizza","wawa","sheetz"]);
+const GENERIC_CUISINE = new Set(["american","burger","burgers","pizza","sandwich","fast_food","coffee_shop","coffee","chicken","fried_chicken",
+  "regional","international","ice_cream","donut","bagel","hot_dog","wings","breakfast","diner","deli","juice","bubble_tea","snack","sub","subs"]);
+const MICHELIN = {"3":[50,"3 Michelin stars"],"2":[45,"2 Michelin stars"],"1":[40,"Michelin star"],
+  "bib_gourmand":[32,"Michelin Bib Gourmand"],"bib gourmand":[32,"Michelin Bib Gourmand"],"selected":[22,"Michelin Guide pick"],"yes":[22,"Michelin Guide pick"]};
+
+function scorePlaces(list){
+  // Same name 3+ times in this search = a chain even if it isn't tagged as one (catches regional chains).
+  const counts = {};
+  for (const p of list){ const k = norm(p.name); counts[k] = (counts[k] || 0) + 1; }
+  for (const p of list){
+    const why = []; let s = 30;
+    const add = (n, label) => { s += n; if (label) why.push((n > 0 ? "+" : "") + n + " " + label); };
+    const key = norm(p.name);
+    const chain = !!p.brandQid || CHAINS.has(key) || CHAINS.has(norm(p.brand)) || counts[key] >= 3;
+    p.chain = chain;
+    const m = MICHELIN[p.michelin];
+    if (m) add(m[0], m[1]);
+    if (chain) add(-20, counts[key] >= 3 && !p.brandQid && !CHAINS.has(key) ? "repeats nearby (chain)" : "chain");
+    else add(18, "independent");
+    if (p.notable) add(10, "has its own Wikipedia/Wikidata entry");
+    const specific = p.cuisines.filter(c => !GENERIC_CUISINE.has(c));
+    if (specific.length) add(8, "specific cuisine");
+    else if (p.cuisines.length) add(3, "cuisine listed");
+    if (p.amenity === "restaurant") add(6, "sit-down");
+    else if (p.amenity === "cafe") add(2, "caf\u00E9");
+    const details = [p.hours, p.site, p.phone, p.addr, p.price && !p.price.est].filter(Boolean).length + (p.diet.length ? 1 : 0);
+    if (details >= 4) add(6, "well-kept listing");
+    else if (details >= 2) add(3, "some listing details");
+    if (p.diet.length) add(2, "dietary options");
+    p.baseScore = s;
+    p.gem = !chain && !m && !p.notable && specific.length > 0 && p.amenity !== "fast_food" && details >= 2;
+    p.award = m ? m[1] : ""; p.awardPts = m ? m[0] : 0;
+    p.why = why;
+  }
+}
+/* Adds the per-search adjustments (distance, open now, and for "Hidden gems" mode a boost for under-the-radar places). */
+function applyRank(p, mode){
+  const extra = []; let s = p.baseScore;
+  const add = (n, label) => { n = Math.round(n); if (!n) return; s += n; extra.push((n > 0 ? "+" : "") + n + " " + label); };
+  if (mode !== "near"){
+    const distPenalty = Math.min(15, (p.dist / Math.max(state.radiusMi, 0.5)) * 15) * (mode === "gems" ? 0.5 : 1);
+    add(-distPenalty, "distance");
+  }
+  if (p.open === true) add(3, "open now"); else if (p.open === false) add(-3, "closed now");
+  if (mode === "gems"){
+    if (p.gem) add(20, "under-the-radar local spot");
+    if (p.chain) add(-20, "chains aren't gems");
+    if (p.awardPts) add(-p.awardPts / 2, "already famous (award)");
+    if (p.notable) add(-8, "already well known");
+  }
+  p.rank = s;
+  p.whyAll = ["base 30"].concat(p.why, extra);
+}
+function displayScore(p){ return Math.max(1, Math.min(99, Math.round(p.rank))); }
+function reviewsUrl(p){
+  return "https://www.google.com/search?q=" + encodeURIComponent(p.name + " " + (p.city || p.addr || "") + " reviews");
+}
+
 function cardHTML(p, opts){
   opts = opts || {};
   const open = p.open === true ? '<span class="badge ok">Open now</span>'
@@ -714,12 +813,21 @@ function cardHTML(p, opts){
     `<a href="${esc(directionsUrl(p))}" target="_blank" rel="noopener">Directions</a>`,
     opts.noMapBtn ? "" : `<button type="button" data-act="map" data-id="${esc(p.id)}">Map</button>`,
     p.phone ? `<a href="tel:${esc(p.phone)}">Call</a>` : "",
-    p.site ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">Website</a>` : ""
+    p.site ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">Website</a>` : "",
+    `<a href="${esc(reviewsUrl(p))}" target="_blank" rel="noopener">Reviews</a>`
   ].join("");
+  const award = p.award ? `<span class="badge award">${esc(p.award)}</span>` : "";
+  const gem = p.gem ? '<span class="badge gem">Hidden gem pick</span>' : "";
   return `<article class="card${opts.dim ? " dim" : ""}">
-    <div class="row"><h3>${esc(p.name)}</h3><span class="dist">${fmtDist(p.dist)}</span></div>
-    ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
-    <div class="badges">${open}${price}${cu}${diet}</div>
+    <div class="head">
+      <div class="score" title="Ranking score">${displayScore(p)}<small>SCORE</small></div>
+      <div class="grow">
+        <div class="row"><h3>${esc(p.name)}</h3><span class="dist">${fmtDist(p.dist)}</span></div>
+        ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
+      </div>
+    </div>
+    <div class="badges">${award}${gem}${open}${price}${cu}${diet}</div>
+    ${p.whyAll ? `<div class="whyrank">Score: ${esc(p.whyAll.join(", "))}</div>` : ""}
     ${p.hours && p.open !== null ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
     <div class="actions">${acts}</div>
     ${opts.dim && p.reasons.length ? `<div class="why">${esc(p.reasons.join("; "))}</div>` : ""}
@@ -729,12 +837,16 @@ function cardHTML(p, opts){
 function render(){
   const now = new Date();
   const vis = [], hid = [];
+  scorePlaces(state.places);
   for (const p of state.places){
     p.open = openStatus(p.hours, now);
     p.reasons = evaluate(p);
     (p.reasons.length ? hid : vis).push(p);
   }
-  vis.sort((a, b) => a.dist - b.dist); hid.sort((a, b) => a.dist - b.dist);
+  const mode = state.sort;
+  for (const p of state.places) applyRank(p, mode);
+  const cmp = mode === "near" ? (a, b) => a.dist - b.dist : (a, b) => b.rank - a.rank || a.dist - b.dist;
+  vis.sort(cmp); hid.sort(cmp);
   state.visible = vis; state.hidden = hid;
   state.bag = state.bag.filter(id => vis.some(p => p.id === id));
 
@@ -742,7 +854,7 @@ function render(){
   if (!state.places.length){
     st.textContent = "Nothing found here. Try a bigger distance or more place types.";
   } else {
-    let s = `${vis.length} place${vis.length === 1 ? "" : "s"} within ${state.radiusMi} mi, nearest first.`;
+    let s = `${vis.length} place${vis.length === 1 ? "" : "s"} within ${state.radiusMi} mi, ${mode === "near" ? "nearest first" : mode === "gems" ? "independent local spots first" : "best match first"}.`;
     if (hid.length) s += ` ${hid.length} hidden by your filters. <button class="link" type="button" id="toggleHidden">${state.showHidden ? "Hide them" : "Show them"}</button>`;
     st.innerHTML = s;
   }
@@ -777,7 +889,8 @@ function nextPick(){
   const vis = state.visible;
   if (!vis.length) return null;
   if (!state.bag.length){
-    state.bag = vis.map(p => p.id);
+    const pool = state.sort === "near" ? vis : vis.slice(0, Math.max(10, Math.ceil(vis.length / 3)));
+    state.bag = pool.map(p => p.id);
     for (let i = state.bag.length - 1; i > 0; i--){
       const j = Math.floor(Math.random() * (i + 1));
       [state.bag[i], state.bag[j]] = [state.bag[j], state.bag[i]];
