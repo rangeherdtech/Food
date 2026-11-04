@@ -216,7 +216,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 7 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  Version 8 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing, and closed places sometimes stay listed. Tap "Check status" before you go.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -528,6 +528,7 @@ function exclusionHits(p){
 }
 function evaluate(p){
   const reasons = [];
+  if (p.closedWhy) reasons.push("Looks closed: " + p.closedWhy);
   const hits = exclusionHits(p);
   if (hits.length) reasons.push("Avoiding: " + hits.join(", "));
   if (state.openNow && p.open === false) reasons.push("Closed now");
@@ -544,6 +545,26 @@ function parsePrice(t){
   if (t.amenity === "fast_food") return {level: 1, est: true};
   return null;
 }
+/* Closure signals that mappers leave in the data. Returns a reason string, or "" if nothing says it's closed. */
+function closedReason(t){
+  const yes = v => /^(yes|true|1)$/i.test(String(v || ""));
+  if (yes(t.disused) || yes(t.abandoned) || yes(t.closed) || yes(t["abandoned:amenity"]) ) return "tagged as disused or closed";
+  if (/^(off|closed)$/i.test(String(t.opening_hours || "").trim())) return "hours say closed";
+  const now = Date.now();
+  const end = t.end_date ? Date.parse(t.end_date) : 0;
+  if (end && end < now) return "closed since " + t.end_date;
+  const opening = t.opening_date ? Date.parse(t.opening_date) : 0;
+  if (opening && opening > now) return "not open yet (opens " + t.opening_date + ")";
+  const text = [t.name, t.note, t.description, t["note:en"]].filter(Boolean).join(" ");
+  if (/\((permanently )?closed\)|\bpermanently closed\b|\bclosed down\b|\bout of business\b|\bno longer (open|operating|in business)\b|\b(has|have) closed\b|\bnow closed\b|\bclosed for good\b/i.test(text)) return "noted as closed";
+  return "";
+}
+const YEAR_MS = 365.25 * 24 * 3600 * 1000;
+function ageYears(p){
+  const last = Math.max(p.edited || 0, p.checked || 0);
+  return last ? (Date.now() - last) / YEAR_MS : null;
+}
+
 function toPlace(el, center){
   const t = el.tags || {};
   const lat = el.lat != null ? el.lat : el.center && el.center.lat;
@@ -572,6 +593,7 @@ function toPlace(el, center){
     notable: !!(t.wikipedia || t.wikidata) && !t["brand:wikidata"],
     michelin: String(t["award:michelin"] || t["michelin"] || "").toLowerCase().trim(),
     city: t["addr:city"] || "",
+    closedWhy: closedReason(t), edited: el.timestamp ? Date.parse(el.timestamp) : 0, checked: t.check_date ? Date.parse(t.check_date) : 0,
     sport: t.sport || "", food: t.food || "",
     siteHost: siteParts(site).host, sitePath: siteParts(site).path
   };
@@ -689,7 +711,7 @@ async function runSearch(){
   const parts = [];
   if (amenityTypes.length) parts.push(`nw["amenity"~"^(${amenityTypes.join("|")})$"]["name"](around:${R},${lat},${lon});`);
   if (shopTypes.length) parts.push(`nw["shop"~"^(${shopTypes.join("|")})$"]["name"](around:${R},${lat},${lon});`);
-  const q = `[out:json][timeout:${overpassTimeoutMs(state.radiusMi) / 1000}];(${parts.join("")});out center ${state.radiusMi > 10 ? 1500 : 400};`;
+  const q = `[out:json][timeout:${overpassTimeoutMs(state.radiusMi) / 1000}];(${parts.join("")});out meta center ${state.radiusMi > 10 ? 1500 : 400};`;
 
   const problems = [];
   const report = m => problems.push(m);
@@ -916,6 +938,13 @@ function scorePlaces(list){
     else if (details >= 2) add(3, "some listing details");
     if (p.diet.length) add(2, "dietary options");
 
+    const age = ageYears(p);
+    p.ageYears = age;
+    if (age !== null){
+      if (p.checked && (Date.now() - p.checked) / YEAR_MS < 2) add(3, "listing verified recently");
+      else if (age > 7) add(-6, "listing not updated in 7+ years");
+      else if (age > 4) add(-3, "listing not updated in 4+ years");
+    }
     p.baseScore = s;
     p.award = m ? m[1] : ""; p.awardPts = m ? m[0] : 0; p.starred = !!(m && m[2]);
     const foodFirst = p.amenity === "restaurant" || p.amenity === "cafe" || p.amenity === "deli" || p.amenity === "bakery" || (barFirst && specific.length > 0);
@@ -946,7 +975,7 @@ function applyRank(p, mode){
 }
 function displayScore(p){ return Math.max(1, Math.min(99, Math.round(p.rank))); }
 function reviewsUrl(p){
-  return "https://www.google.com/search?q=" + encodeURIComponent(p.name + " " + (p.city || p.addr || "") + " reviews");
+  return "https://www.google.com/search?q=" + encodeURIComponent(p.name + " " + (p.city || p.addr || "") + " hours reviews");
 }
 
 function cardHTML(p, opts){
@@ -963,10 +992,12 @@ function cardHTML(p, opts){
     opts.noMapBtn ? "" : `<button type="button" data-act="map" data-id="${esc(p.id)}">Map</button>`,
     p.phone ? `<a href="tel:${esc(p.phone)}">Call</a>` : "",
     p.site ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">Website</a>` : "",
-    `<a href="${esc(reviewsUrl(p))}" target="_blank" rel="noopener">Reviews</a>`
+    `<a href="${esc(reviewsUrl(p))}" target="_blank" rel="noopener">Check status</a>`
   ].join("");
   const award = p.award ? `<span class="badge award">${esc(p.award)}</span>` : "";
   const gem = p.gem ? '<span class="badge gem">Hidden gem pick</span>' : "";
+  const stale = p.ageYears !== null && p.ageYears !== undefined && p.ageYears > 4
+    ? `<span class="badge">Listing last updated ${new Date(Math.max(p.edited || 0, p.checked || 0)).getFullYear()}, may be out of date</span>` : "";
   const chainB = p.chain ? `<span class="badge bad">${p.chainScope === "national" ? "National chain" : "Regional chain"}</span>` : "";
   return `<article class="card${opts.dim ? " dim" : ""}">
     <div class="head">
@@ -976,7 +1007,7 @@ function cardHTML(p, opts){
         ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
       </div>
     </div>
-    <div class="badges">${award}${gem}${chainB}${open}${price}${cu}${diet}</div>
+    <div class="badges">${award}${gem}${chainB}${stale}${open}${price}${cu}${diet}</div>
     ${p.whyAll ? `<div class="whyrank">Score: ${esc(p.whyAll.join(", "))}</div>` : ""}
     ${p.hours && p.open !== null ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
     <div class="actions">${acts}</div>
