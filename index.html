@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6f5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Where to Eat">
+<title>Where to Eat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#f6f5f1; --card:#ffffff; --ink:#1d2421; --muted:#667069; --line:#e2e0d8;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --accent-soft:#e1f0ea;
+  --ok:#1b7a43; --ok-bg:#e0f3e7; --bad:#a63a2b; --bad-bg:#f8e3df; --warn-bg:#eceae3;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121614; --card:#1b211e; --ink:#e8ede9; --muted:#9aa59e; --line:#2d3631;
+    --accent:#3fb592; --accent-ink:#08150f; --accent-soft:#1b3a30;
+    --ok:#6fd199; --ok-bg:#183626; --bad:#f19a8c; --bad-bg:#40221d; --warn-bg:#27302b;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header.top{padding:20px 16px 4px;max-width:720px;margin:0 auto}
+header.top h1{margin:0;font-size:26px;letter-spacing:-.02em}
+header.top p{margin:4px 0 0;color:var(--muted);font-size:15px}
+main{max-width:720px;margin:0 auto;padding:12px 16px 40px;display:grid;gap:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+.panel h2{margin:0 0 10px;font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.panel h3.sub{margin:14px 0 6px;font-size:14px;color:var(--muted);font-weight:600}
+.btn{appearance:none;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;
+  padding:11px 14px;border-radius:12px;cursor:pointer;min-height:44px}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.primary.big{width:100%;font-size:18px;padding:14px}
+.btn:disabled{opacity:.55;cursor:default}
+.loc-actions{display:flex;gap:8px;flex-wrap:wrap}
+.loc-actions .btn{flex:1 1 150px}
+.addr{display:flex;gap:8px;margin-top:10px}
+.addr input,.kw input{flex:1;min-width:0;font:inherit;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-height:44px}
+.addr-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.addr-results button{width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 10px;cursor:pointer}
+.loc-label{margin:10px 0 0;font-weight:600}
+.loc-label.none{color:var(--muted);font-weight:400}
+.field{display:grid;gap:6px;margin-bottom:12px}
+.field label.t{font-weight:600;display:flex;justify-content:space-between}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{appearance:none;font:inherit;font-size:15px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-height:38px}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.chip.avoid[aria-pressed=true]{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.chip.avoid[aria-pressed=true]::before{content:"\2715  "}
+.checks{display:flex;flex-wrap:wrap;gap:6px 16px}
+.checks label{display:flex;gap:7px;align-items:center;min-height:36px}
+.checks input{width:18px;height:18px;accent-color:var(--accent)}
+.kw{display:flex;gap:8px;margin-top:6px}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button{flex:1;font:inherit;font-weight:600;padding:9px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-height:42px}
+.tabs button[aria-selected=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.status{margin:0 0 10px;color:var(--muted);font-size:14px}
+.status button.link{font:inherit;color:var(--accent);background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
+.pickrow{margin-bottom:10px}
+.cards{display:grid;gap:10px}
+.card{border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--bg)}
+.card.dim{opacity:.6}
+.card .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.card h3{margin:0;font-size:17px;line-height:1.25}
+.card .dist{white-space:nowrap;color:var(--muted);font-size:14px}
+.card .meta{color:var(--muted);font-size:14px;margin-top:2px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.badge{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--warn-bg);color:var(--muted)}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.diet{background:var(--accent-soft);color:var(--accent)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.actions a,.actions button{font:inherit;font-size:14px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);background:var(--card);
+  padding:7px 12px;border-radius:10px;cursor:pointer;min-height:38px;display:inline-flex;align-items:center}
+.why{font-size:13px;color:var(--bad);margin-top:6px}
+.empty{color:var(--muted);text-align:center;padding:22px 8px}
+#map{height:62vh;min-height:360px;border-radius:12px;border:1px solid var(--line)}
+.banner{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent);padding:9px 12px;border-radius:10px;margin-bottom:8px;font-weight:600}
+.me-pin{width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 2px #2563eb55,0 1px 4px #0006}
+.sheet{position:fixed;inset:0;background:#0008;display:flex;align-items:flex-end;justify-content:center;z-index:2000}
+.sheet[hidden]{display:none}
+.sheet .box{background:var(--card);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:85vh;overflow:auto}
+.sheet h2{margin:0 0 10px;font-size:20px}
+.sheet .btns{display:flex;gap:8px;margin-top:12px}
+.sheet .btns .btn{flex:1}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:12px;
+  z-index:3000;max-width:90vw;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12.5px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Where to Eat</h1>
+  <p>Set your spot, filter, and skip the food you don't want.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>1 &middot; Where are you?</h2>
+    <div class="loc-actions">
+      <button class="btn" id="btnGeo" type="button">Use my location</button>
+      <button class="btn ghost" id="btnPin" type="button">Drop a pin on the map</button>
+    </div>
+    <form class="addr" id="addrForm">
+      <input id="addr" type="search" placeholder="Or type an address, city, or ZIP" enterkeyhint="search" aria-label="Address, city, or ZIP">
+      <button class="btn ghost" type="submit">Go</button>
+    </form>
+    <ul class="addr-results" id="addrResults"></ul>
+    <p class="loc-label none" id="locLabel">No location set yet</p>
+  </section>
+
+  <section class="panel">
+    <h2>2 &middot; Search filters</h2>
+    <div class="field">
+      <label class="t" for="radius"><span>Distance</span><span id="radiusVal">2 mi</span></label>
+      <input id="radius" type="range" min="0.5" max="10" step="0.5" value="2">
+    </div>
+    <div class="field">
+      <span class="t">Max price</span>
+      <div class="chips" id="priceChips" role="radiogroup" aria-label="Max price">
+        <button class="chip" type="button" data-price="0" aria-pressed="true">Any</button>
+        <button class="chip" type="button" data-price="1" aria-pressed="false">$</button>
+        <button class="chip" type="button" data-price="2" aria-pressed="false">$$</button>
+        <button class="chip" type="button" data-price="3" aria-pressed="false">$$$</button>
+        <button class="chip" type="button" data-price="4" aria-pressed="false">$$$$</button>
+      </div>
+    </div>
+    <div class="field">
+      <div class="checks">
+        <label><input type="checkbox" id="openNow"> Open now only</label>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <span class="t">Place types</span>
+      <div class="checks" id="typeChecks">
+        <label><input type="checkbox" value="restaurant" checked> Restaurants</label>
+        <label><input type="checkbox" value="fast_food" checked> Fast food</label>
+        <label><input type="checkbox" value="cafe"> Caf&eacute;s</label>
+      </div>
+    </div>
+    <p class="note">Places with unknown hours or price are still shown, tagged "unknown", because OpenStreetMap data is incomplete.</p>
+  </section>
+
+  <section class="panel">
+    <h2>3 &middot; Food to avoid</h2>
+    <h3 class="sub" style="margin-top:0">Cuisines</h3>
+    <div class="chips" id="exCuisine"></div>
+    <h3 class="sub">Ingredients &amp; diet (best effort)</h3>
+    <div class="chips" id="exDiet"></div>
+    <h3 class="sub">Anything else</h3>
+    <form class="kw" id="kwForm">
+      <input id="kwInput" type="text" placeholder="e.g. mushrooms, sushi, buffet" enterkeyhint="done" aria-label="Add a food to avoid">
+      <button class="btn ghost" type="submit">Add</button>
+    </form>
+    <div class="chips" id="kwChips" style="margin-top:8px"></div>
+    <p class="note">Map data has no menus. Exclusions match cuisine tags and names, so a place can slip through. Don't rely on this for allergies.</p>
+  </section>
+
+  <button class="btn primary big" id="btnSearch" type="button">Find restaurants</button>
+
+  <section class="panel" id="results">
+    <h2>Results</h2>
+    <div class="pickrow"><button class="btn" id="btnPick" type="button" style="width:100%">Pick one for me</button></div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="list" aria-selected="true">List</button>
+      <button type="button" role="tab" data-tab="map" aria-selected="false">Map</button>
+    </div>
+    <p class="status" id="status">Set a location, then tap Find restaurants.</p>
+    <div id="listView"><div class="cards" id="cards"></div></div>
+    <div id="mapView" hidden>
+      <div class="banner" id="pinBanner" hidden>Tap the map to set your search spot.</div>
+      <div id="map"></div>
+    </div>
+  </section>
+</main>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-label="Restaurant pick">
+    <h2>How about this?</h2>
+    <div id="sheetCard"></div>
+    <div class="btns">
+      <button class="btn ghost" id="sheetClose" type="button">Close</button>
+      <button class="btn" id="sheetNext" type="button">Pick another</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<footer>
+  Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  "Open now" uses your device's clock against each place's listed hours.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
+const MI = 1609.344;
+const IS_APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+let toastTimer;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+}
+function haversineMi(a, b, c, d){
+  const R = 3958.8, r = x => x * Math.PI / 180;
+  const dLat = r(c - a), dLon = r(d - b);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/* ---------- exclusion definitions ---------- */
+/* cuisines: exact OSM cuisine tag values (lowercase, underscores). kw: words matched in name/brand/description/cuisine. */
+const EX = {
+  pizza:{label:"Pizza",group:"cuisine",cuisines:["pizza","pizzeria"],kw:["pizza","pizzeria"]},
+  burger:{label:"Burgers",group:"cuisine",cuisines:["burger","burgers","hamburger"],kw:["burger","hamburger","burgers"]},
+  sushi:{label:"Sushi / Japanese",group:"cuisine",cuisines:["sushi","japanese","ramen","izakaya","teppanyaki","udon","yakitori","tempura","hibachi"],kw:["sushi","japanese","ramen","izakaya","hibachi","teriyaki","udon","tempura","yakitori"]},
+  chinese:{label:"Chinese",group:"cuisine",cuisines:["chinese","dim_sum","cantonese","szechuan","sichuan","hot_pot","hunan"],kw:["chinese","dim sum","szechuan","sichuan","hunan","panda express","hot pot"]},
+  mexican:{label:"Mexican",group:"cuisine",cuisines:["mexican","taco","tacos","burrito","tex_mex","tacos_and_burritos"],kw:["mexican","taco","burrito","cantina","tex mex","taqueria","quesadilla"]},
+  italian:{label:"Italian",group:"cuisine",cuisines:["italian","pasta"],kw:["italian","pasta","trattoria","osteria","ristorante"]},
+  indian:{label:"Indian",group:"cuisine",cuisines:["indian","pakistani","bangladeshi","nepalese","curry"],kw:["indian","tandoori","curry","masala"]},
+  thai:{label:"Thai",group:"cuisine",cuisines:["thai"],kw:["thai"]},
+  korean:{label:"Korean",group:"cuisine",cuisines:["korean"],kw:["korean","kbbq"]},
+  vietnamese:{label:"Vietnamese",group:"cuisine",cuisines:["vietnamese","pho"],kw:["vietnamese","pho","banh mi"]},
+  seafood:{label:"Seafood",group:"cuisine",cuisines:["seafood","fish","fish_and_chips","poke","oyster_bar"],kw:["seafood","fish","oyster","crab","lobster","shrimp","clam","chowder","poke"]},
+  steak:{label:"Steakhouse",group:"cuisine",cuisines:["steak_house","steak"],kw:["steak","steakhouse","chophouse"]},
+  bbq:{label:"BBQ",group:"cuisine",cuisines:["barbecue","bbq","bar_b_q"],kw:["bbq","barbecue","barbeque","smokehouse"]},
+  chicken:{label:"Chicken / wings",group:"cuisine",cuisines:["chicken","wings","fried_chicken"],kw:["chicken","wings","wing"]},
+  sandwich:{label:"Sandwiches / delis",group:"cuisine",cuisines:["sandwich","deli","sub","subs","bagel"],kw:["sandwich","deli","subs","sub shop","hoagie","bagel"]},
+  med:{label:"Mediterranean",group:"cuisine",cuisines:["mediterranean","greek","lebanese","middle_eastern","turkish","kebab","gyro","falafel"],kw:["mediterranean","greek","lebanese","kebab","gyro","falafel","shawarma"]},
+  french:{label:"French",group:"cuisine",cuisines:["french","crepe","creperie"],kw:["french","brasserie","crepe","creperie"]},
+  american:{label:"American / diner",group:"cuisine",cuisines:["american","diner","regional"],kw:["american","diner"]},
+  breakfast:{label:"Breakfast / brunch",group:"cuisine",cuisines:["breakfast","brunch","pancake","waffle"],kw:["breakfast","brunch","pancake","waffle"]},
+  dessert:{label:"Desserts / ice cream",group:"cuisine",cuisines:["ice_cream","dessert","frozen_yogurt","donut","cake","gelato"],kw:["ice cream","gelato","dessert","donut","doughnut","frozen yogurt","creamery"]},
+
+  pork:{label:"Pork",group:"diet",cuisines:["barbecue","bbq","bar_b_q"],kw:["pork","bacon","ham","sausage","ribs","carnitas","bbq","barbecue","smokehouse","bratwurst"]},
+  shellfish:{label:"Shellfish",group:"diet",cuisines:["seafood","crab","lobster","oyster","oyster_bar","cajun","creole"],kw:["shrimp","crab","lobster","oyster","clam","crawfish","crayfish","shellfish","mussel","scallop","cajun","seafood"]},
+  gluten:{label:"Gluten-heavy",group:"diet",cuisines:["pizza","pizzeria","pasta","sandwich","bakery","bagel","ramen","noodle","noodles","udon","donut"],kw:["pizza","pasta","bakery","bagel","bread","noodle","ramen","sandwich","donut","pretzel","waffle","pancake"]},
+  dairy:{label:"Dairy-heavy",group:"diet",cuisines:["ice_cream","frozen_yogurt","cheese","pizza","pizzeria","creperie","dessert","gelato"],kw:["ice cream","creamery","cheese","pizza","dairy","gelato","frozen yogurt","milkshake","fondue"]},
+  meat:{label:"Meat-centered",group:"diet",cuisines:["steak_house","steak","burger","burgers","barbecue","bbq","chicken","wings","kebab","meat","hot_dog","gyro"],kw:["steak","burger","bbq","barbecue","chicken","wings","kebab","meat","butcher","hot dog","ribs","gyro","carnivore"]}
+};
+
+/* ---------- opening hours ---------- */
+// <hours>
+const DAYS = ["mo","tu","we","th","fr","sa","su"];
+function parseDays(s){
+  if (!s) return new Set([0,1,2,3,4,5,6]);
+  const out = new Set();
+  for (const part of s.toLowerCase().split(",")){
+    const p = part.trim(); if (!p) continue;
+    const m = p.match(/^([a-z]{2})(?:\s*-\s*([a-z]{2}))?$/);
+    if (!m) return null;
+    const a = DAYS.indexOf(m[1]); if (a < 0) return null;
+    if (!m[2]){ out.add(a); continue; }
+    const b = DAYS.indexOf(m[2]); if (b < 0) return null;
+    for (let d = a; ; d = (d + 1) % 7){ out.add(d); if (d === b) break; }
+  }
+  return out.size ? out : null;
+}
+/* returns true (open), false (closed) or null (unknown / can't parse) */
+function openStatus(str, now){
+  if (!str) return null;
+  now = now || new Date();
+  const s = String(str).trim();
+  if (/^24\/7$/i.test(s)) return true;
+  if (/(PH|SH|sunrise|sunset|week|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\[|\+|"|easter|\d{4})/i.test(s)) return null;
+  const rules = s.split(";").map(r => r.trim()).filter(Boolean);
+  const today = (now.getDay() + 6) % 7, yest = (today + 6) % 7;
+  const m = now.getHours() * 60 + now.getMinutes();
+  let result = null, spill = false, anyOk = false;
+  for (const r of rules){
+    const mm = r.match(/^([A-Za-z][A-Za-z,\-\s]*?)?\s*((?:\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*,?\s*)+|off|closed)?\s*$/i);
+    if (!mm || !mm[2]) return null;
+    const days = parseDays(mm[1] && mm[1].trim());
+    if (!days) return null;
+    anyOk = true;
+    const t = mm[2].trim().toLowerCase();
+    if (t === "off" || t === "closed"){
+      if (days.has(today)) result = false;
+      continue;
+    }
+    const ivs = [...t.matchAll(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/g)]
+      .map(x => [+x[1] * 60 + +x[2], +x[3] * 60 + +x[4]]);
+    if (days.has(today)) result = ivs.some(([a, b]) => b > a ? (m >= a && m < b) : m >= a);
+    if (days.has(yest) && ivs.some(([a, b]) => b <= a && m < b)) spill = true;
+  }
+  if (!anyOk) return null;
+  if (spill) return true;
+  return result === null ? false : result;
+}
+// </hours>
+
+/* ---------- state ---------- */
+const state = {
+  center: null, label: "", radiusMi: 2, maxPrice: 0, openNow: false,
+  types: new Set(["restaurant","fast_food"]),
+  excluded: new Set(), keywords: [],
+  places: [], visible: [], searched: false, showHidden: false,
+  pinMode: false, bag: [], currentPick: null
+};
+
+/* ---------- map ---------- */
+// If the map library fails to load (offline, blocked CDN), swap in a no-op so the rest of the app still works.
+if (typeof L === "undefined"){
+  const noop = new Proxy(function(){}, {get: () => noop, apply: () => noop});
+  window.L = noop;
+  document.addEventListener("DOMContentLoaded", () => {
+    $("#map").innerHTML = '<p class="empty">The map couldn\'t load. The list and address search still work.</p>';
+  });
+}
+const map = L.map("map").setView([39.5, -98.35], 4);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+const placeLayer = L.layerGroup().addTo(map);
+let meMarker = null, radiusCircle = null;
+const markers = new Map();
+
+function zoomFor(mi){ return mi <= .75 ? 15 : mi <= 1.5 ? 14 : mi <= 3 ? 13 : mi <= 6 ? 12 : 11; }
+
+function setCenter(lat, lon, label, opts){
+  opts = opts || {};
+  state.center = {lat, lon}; state.label = label;
+  const el = $("#locLabel"); el.textContent = "Searching from: " + label; el.classList.remove("none");
+  if (meMarker) meMarker.setLatLng([lat, lon]);
+  else meMarker = L.marker([lat, lon], {icon: L.divIcon({className:"", html:'<div class="me-pin"></div>', iconSize:[18,18], iconAnchor:[9,9]}), keyboard:false}).addTo(map);
+  if (radiusCircle) radiusCircle.setLatLng([lat, lon]).setRadius(state.radiusMi * MI);
+  else radiusCircle = L.circle([lat, lon], {radius: state.radiusMi * MI, color:"#2563eb", weight:1, fillOpacity:.05, interactive:false}).addTo(map);
+  if (opts.pan) map.panTo([lat, lon]); else map.setView([lat, lon], zoomFor(state.radiusMi));
+}
+
+map.on("click", e => {
+  if (!state.pinMode) return;
+  setPinMode(false);
+  setCenter(e.latlng.lat, e.latlng.lng, "Dropped pin", {pan:true});
+  toast("Spot set. Tap Find restaurants.");
+});
+function setPinMode(on){
+  state.pinMode = on;
+  $("#pinBanner").hidden = !on;
+  if (on){ showTab("map"); $("#results").scrollIntoView({behavior:"smooth", block:"start"}); }
+}
+
+/* ---------- tabs ---------- */
+function showTab(name){
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  $("#listView").hidden = name !== "list";
+  $("#mapView").hidden = name !== "map";
+  if (name === "map") setTimeout(() => map.invalidateSize(), 50);
+}
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+/* ---------- location inputs ---------- */
+function geoHelp(msg){
+  const el = $("#locLabel"); el.textContent = msg; el.classList.add("none");
+  toast(msg);
+}
+$("#btnGeo").addEventListener("click", () => {
+  if (!window.isSecureContext){
+    geoHelp("Location only works on a secure https:// page, not a downloaded file or preview. Type an address instead, or host the app first.");
+    return;
+  }
+  if (!navigator.geolocation){ geoHelp("This browser can't share location. Type an address instead."); return; }
+  const btn = $("#btnGeo");
+  btn.disabled = true; btn.textContent = "Finding you...";
+  const done = () => { btn.disabled = false; btn.textContent = "Use my location"; };
+  const fail = err => {
+    done();
+    if (err.code === 1) geoHelp("Location is blocked. On iPhone: Settings > Privacy & Security > Location Services > Safari Websites > While Using, then reload. Or type an address.");
+    else if (err.code === 3) geoHelp("Location timed out. Try again, or type an address.");
+    else geoHelp("Couldn't get your location. Try again, or type an address.");
+  };
+  navigator.geolocation.getCurrentPosition(
+    pos => { done(); setCenter(pos.coords.latitude, pos.coords.longitude, "Current location"); },
+    err => {
+      // Retry once with high accuracy before giving up (some phones fail the coarse request)
+      if (err.code === 2 || err.code === 3){
+        navigator.geolocation.getCurrentPosition(
+          pos => { done(); setCenter(pos.coords.latitude, pos.coords.longitude, "Current location"); },
+          fail, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+      } else fail(err);
+    },
+    {enableHighAccuracy:false, timeout:10000, maximumAge:60000}
+  );
+});
+$("#btnPin").addEventListener("click", () => setPinMode(!state.pinMode));
+
+$("#addrForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const q = $("#addr").value.trim(); if (!q) return;
+  const list = $("#addrResults"); list.innerHTML = '<li class="status"><span class="spin"></span>Looking up address...</li>';
+  try{
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=" + encodeURIComponent(q));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    if (!data.length){ list.innerHTML = '<li class="status">No match found. Try adding a city or state.</li>'; return; }
+    const short = d => d.display_name.split(",").slice(0, 3).join(",").trim();
+    if (data.length === 1){ list.innerHTML = ""; setCenter(+data[0].lat, +data[0].lon, short(data[0])); return; }
+    list.innerHTML = data.map((d, i) => `<li><button type="button" data-i="${i}">${esc(d.display_name)}</button></li>`).join("");
+    list.onclick = ev => {
+      const b = ev.target.closest("button[data-i]"); if (!b) return;
+      const d = data[+b.dataset.i]; list.innerHTML = "";
+      setCenter(+d.lat, +d.lon, short(d));
+    };
+  }catch(err){
+    list.innerHTML = '<li class="status">Address lookup failed. Check your connection and try again.</li>';
+  }
+});
+
+/* ---------- filter controls ---------- */
+$("#radius").addEventListener("input", e => {
+  state.radiusMi = +e.target.value;
+  $("#radiusVal").textContent = state.radiusMi + " mi";
+  if (radiusCircle) radiusCircle.setRadius(state.radiusMi * MI);
+});
+$("#priceChips").addEventListener("click", e => {
+  const b = e.target.closest("button[data-price]"); if (!b) return;
+  state.maxPrice = +b.dataset.price;
+  document.querySelectorAll("#priceChips .chip").forEach(c => c.setAttribute("aria-pressed", String(c === b)));
+  refilter();
+});
+$("#openNow").addEventListener("change", e => { state.openNow = e.target.checked; refilter(); });
+$("#typeChecks").addEventListener("change", e => {
+  const cb = e.target; if (!cb.matches("input")) return;
+  if (cb.checked) state.types.add(cb.value); else state.types.delete(cb.value);
+  if (!state.types.size){ state.types.add(cb.value); cb.checked = true; toast("Keep at least one place type selected."); }
+});
+
+function buildExChips(){
+  for (const [id, d] of Object.entries(EX)){
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip avoid"; b.dataset.ex = id; b.textContent = d.label; b.setAttribute("aria-pressed", "false");
+    $(d.group === "cuisine" ? "#exCuisine" : "#exDiet").appendChild(b);
+  }
+}
+buildExChips();
+document.addEventListener("click", e => {
+  const b = e.target.closest("button[data-ex]"); if (!b) return;
+  const id = b.dataset.ex;
+  if (state.excluded.has(id)) state.excluded.delete(id); else state.excluded.add(id);
+  b.setAttribute("aria-pressed", String(state.excluded.has(id)));
+  refilter();
+});
+
+function renderKwChips(){
+  $("#kwChips").innerHTML = state.keywords.map((k, i) =>
+    `<button type="button" class="chip avoid" aria-pressed="true" data-kwdel="${i}" title="Remove">${esc(k)}</button>`).join("");
+}
+$("#kwChips").addEventListener("click", e => {
+  const b = e.target.closest("button[data-kwdel]"); if (!b) return;
+  state.keywords.splice(+b.dataset.kwdel, 1); renderKwChips(); refilter();
+});
+$("#kwForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const v = $("#kwInput").value.trim().slice(0, 40);
+  if (!v) return;
+  if (!state.keywords.some(k => k.toLowerCase() === v.toLowerCase())) state.keywords.push(v);
+  $("#kwInput").value = ""; renderKwChips(); refilter();
+});
+
+/* ---------- matching ---------- */
+const reCache = new Map();
+function kwRegex(k){
+  const key = "k:" + k;
+  if (!reCache.has(key)) reCache.set(key, new RegExp("\\b" + escRe(norm(k)) + "(?:s|es)?\\b"));
+  return reCache.get(key);
+}
+function freeRegex(k){
+  const key = "f:" + k;
+  if (!reCache.has(key)){
+    let w = norm(k);
+    if (w.length > 4 && w.endsWith("es")) w = w.slice(0, -2);
+    else if (w.length > 3 && w.endsWith("s")) w = w.slice(0, -1);
+    reCache.set(key, new RegExp("\\b" + escRe(w) + "(?:s|es)?\\b"));
+  }
+  return reCache.get(key);
+}
+function exclusionHits(p){
+  const hits = [];
+  for (const id of state.excluded){
+    const d = EX[id];
+    if (d.cuisines.some(c => p.cuisineSet.has(c)) || d.kw.some(k => kwRegex(k).test(p.hay))) hits.push(d.label);
+  }
+  for (const k of state.keywords) if (freeRegex(k).test(p.hay)) hits.push("\u201C" + k + "\u201D");
+  return hits;
+}
+function evaluate(p){
+  const reasons = [];
+  const hits = exclusionHits(p);
+  if (hits.length) reasons.push("Avoiding: " + hits.join(", "));
+  if (state.openNow && p.open === false) reasons.push("Closed now");
+  if (state.maxPrice && p.price && p.price.level > state.maxPrice) reasons.push("Above your max price");
+  return reasons;
+}
+
+/* ---------- data ---------- */
+function parsePrice(t){
+  const v = String(t.price_range || t["price:range"] || "").trim();
+  if (/^[$\u20AC\u00A3\u00A5]{1,4}$/.test(v)) return {level: v.length, est: false};
+  const w = {cheap:1, inexpensive:1, moderate:2, expensive:3, very_expensive:4}[v.toLowerCase().replace(/\s+/g, "_")];
+  if (w) return {level: w, est: false};
+  if (t.amenity === "fast_food") return {level: 1, est: true};
+  return null;
+}
+function toPlace(el, center){
+  const t = el.tags || {};
+  const lat = el.lat != null ? el.lat : el.center && el.center.lat;
+  const lon = el.lon != null ? el.lon : el.center && el.center.lon;
+  if (lat == null || lon == null || !t.name) return null;
+  const cuisines = String(t.cuisine || "").split(";").map(c => c.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")).filter(Boolean);
+  const cuisineText = cuisines.map(c => c.replace(/_/g, " "));
+  const addr = [[t["addr:housenumber"], t["addr:street"]].filter(Boolean).join(" "), t["addr:city"]].filter(Boolean).join(", ");
+  const diet = [];
+  if (t["diet:vegan"] === "yes" || t["diet:vegan"] === "only") diet.push("Vegan options");
+  if (t["diet:vegetarian"] === "yes" || t["diet:vegetarian"] === "only") diet.push("Vegetarian options");
+  if (t["diet:gluten_free"] === "yes" || t["diet:gluten_free"] === "only") diet.push("Gluten-free options");
+  let site = t.website || t["contact:website"] || "";
+  if (site && !/^https?:\/\//i.test(site)) site = /^[\w.-]+\.[a-z]{2,}/i.test(site) ? "https://" + site : "";
+  const phone = String(t.phone || t["contact:phone"] || "").replace(/[^\d+]/g, "");
+  return {
+    id: el.type + el.id, name: t.name, lat, lon,
+    dist: haversineMi(center.lat, center.lon, lat, lon),
+    amenity: t.amenity, cuisines, cuisineSet: new Set(cuisines),
+    cuisineLabel: cuisineText.map(title).join(", "),
+    hay: norm([t.name, t.brand, t.description, cuisineText.join(" ")].filter(Boolean).join(" ")),
+    hours: t.opening_hours || "", price: parsePrice(t), addr, diet, site, phone
+  };
+}
+
+const ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+async function overpass(q){
+  let lastErr;
+  for (const url of ENDPOINTS){
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 35000);
+    try{
+      const r = await fetch(url, {method:"POST", body:"data=" + encodeURIComponent(q), headers:{"Content-Type":"application/x-www-form-urlencoded"}, signal:ctl.signal});
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return await r.json();
+    }catch(err){ clearTimeout(timer); lastErr = err; }
+  }
+  throw lastErr;
+}
+
+async function runSearch(){
+  if (!state.center){ toast("Set a location first."); $("#locLabel").scrollIntoView({behavior:"smooth", block:"center"}); return; }
+  const btn = $("#btnSearch");
+  btn.disabled = true; btn.textContent = "Searching...";
+  $("#status").innerHTML = '<span class="spin"></span>Looking for places nearby...';
+  $("#cards").innerHTML = "";
+  $("#results").scrollIntoView({behavior:"smooth", block:"start"});
+  const {lat, lon} = state.center;
+  const center = {lat, lon};
+  const R = Math.round(state.radiusMi * MI);
+  const types = [...state.types].join("|");
+  const q = `[out:json][timeout:25];nwr["amenity"~"^(${types})$"]["name"](around:${R},${lat},${lon});out center tags 1000;`;
+  try{
+    const json = await overpass(q);
+    const seen = new Set();
+    state.places = (json.elements || []).map(el => toPlace(el, center)).filter(p => p && !seen.has(p.id) && seen.add(p.id));
+    state.searched = true; state.bag = [];
+    map.fitBounds(radiusCircle.getBounds(), {padding:[10,10]});
+    render();
+  }catch(err){
+    state.places = [];
+    $("#status").innerHTML = 'The map data service is busy or unreachable. <button class="link" type="button" id="retry">Try again</button>';
+  }finally{
+    btn.disabled = false; btn.textContent = "Find restaurants";
+  }
+}
+$("#btnSearch").addEventListener("click", runSearch);
+document.addEventListener("click", e => { if (e.target.id === "retry") runSearch(); });
+
+/* ---------- rendering ---------- */
+function directionsUrl(p){
+  return IS_APPLE
+    ? `https://maps.apple.com/?daddr=${p.lat},${p.lon}&dirflg=d`
+    : `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lon}`;
+}
+const fmtDist = d => d < 0.1 ? "<0.1 mi" : d.toFixed(1) + " mi";
+
+function cardHTML(p, opts){
+  opts = opts || {};
+  const open = p.open === true ? '<span class="badge ok">Open now</span>'
+             : p.open === false ? '<span class="badge bad">Closed now</span>'
+             : '<span class="badge">Hours unknown</span>';
+  const price = p.price ? `<span class="badge">${"$".repeat(p.price.level)}${p.price.est ? " (est.)" : ""}</span>` : '<span class="badge">Price unknown</span>';
+  const cu = p.cuisines.length ? "" : '<span class="badge">Cuisine unknown</span>';
+  const diet = p.diet.map(d => `<span class="badge diet">${esc(d)}</span>`).join("");
+  const meta = [p.cuisineLabel, p.addr].filter(Boolean).join(" \u00B7 ");
+  const acts = [
+    `<a href="${esc(directionsUrl(p))}" target="_blank" rel="noopener">Directions</a>`,
+    opts.noMapBtn ? "" : `<button type="button" data-act="map" data-id="${esc(p.id)}">Map</button>`,
+    p.phone ? `<a href="tel:${esc(p.phone)}">Call</a>` : "",
+    p.site ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">Website</a>` : ""
+  ].join("");
+  return `<article class="card${opts.dim ? " dim" : ""}">
+    <div class="row"><h3>${esc(p.name)}</h3><span class="dist">${fmtDist(p.dist)}</span></div>
+    ${meta ? `<div class="meta">${esc(meta)}</div>` : ""}
+    <div class="badges">${open}${price}${cu}${diet}</div>
+    ${p.hours && p.open !== null ? `<div class="meta">Hours: ${esc(p.hours)}</div>` : ""}
+    <div class="actions">${acts}</div>
+    ${opts.dim && p.reasons.length ? `<div class="why">${esc(p.reasons.join("; "))}</div>` : ""}
+  </article>`;
+}
+
+function render(){
+  const now = new Date();
+  const vis = [], hid = [];
+  for (const p of state.places){
+    p.open = openStatus(p.hours, now);
+    p.reasons = evaluate(p);
+    (p.reasons.length ? hid : vis).push(p);
+  }
+  vis.sort((a, b) => a.dist - b.dist); hid.sort((a, b) => a.dist - b.dist);
+  state.visible = vis; state.hidden = hid;
+  state.bag = state.bag.filter(id => vis.some(p => p.id === id));
+
+  const st = $("#status");
+  if (!state.places.length){
+    st.textContent = "Nothing found here. Try a bigger distance or more place types.";
+  } else {
+    let s = `${vis.length} place${vis.length === 1 ? "" : "s"} within ${state.radiusMi} mi, nearest first.`;
+    if (hid.length) s += ` ${hid.length} hidden by your filters. <button class="link" type="button" id="toggleHidden">${state.showHidden ? "Hide them" : "Show them"}</button>`;
+    st.innerHTML = s;
+  }
+  let html = vis.map(p => cardHTML(p)).join("");
+  if (!vis.length && state.places.length) html = '<div class="empty">Everything nearby is filtered out. Loosen a filter or show the hidden places.</div>';
+  if (state.showHidden && hid.length) html += hid.map(p => cardHTML(p, {dim:true})).join("");
+  $("#cards").innerHTML = html;
+
+  placeLayer.clearLayers(); markers.clear();
+  for (const p of vis){
+    const m = L.circleMarker([p.lat, p.lon], {radius:8, color:"#145243", weight:2, fillColor:"#2fb391", fillOpacity:.9});
+    m.bindPopup(`<strong>${esc(p.name)}</strong><br>${esc(fmtDist(p.dist))}${p.cuisineLabel ? " \u00B7 " + esc(p.cuisineLabel) : ""}<br><a href="${esc(directionsUrl(p))}" target="_blank" rel="noopener">Directions</a>`);
+    m.addTo(placeLayer); markers.set(p.id, m);
+  }
+}
+function refilter(){ if (state.searched) render(); }
+
+document.addEventListener("click", e => {
+  if (e.target.id === "toggleHidden"){ state.showHidden = !state.showHidden; render(); return; }
+  const b = e.target.closest('button[data-act="map"]'); if (!b) return;
+  const p = state.places.find(x => x.id === b.dataset.id); if (!p) return;
+  closeSheet(); showTab("map");
+  $("#results").scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(() => {
+    map.setView([p.lat, p.lon], Math.max(map.getZoom(), 16));
+    const m = markers.get(p.id); if (m) m.openPopup();
+  }, 120);
+});
+
+/* ---------- pick for me ---------- */
+function nextPick(){
+  const vis = state.visible;
+  if (!vis.length) return null;
+  if (!state.bag.length){
+    state.bag = vis.map(p => p.id);
+    for (let i = state.bag.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [state.bag[i], state.bag[j]] = [state.bag[j], state.bag[i]];
+    }
+    if (state.bag.length > 1 && state.bag[state.bag.length - 1] === state.currentPick){
+      state.bag.unshift(state.bag.pop());
+    }
+  }
+  const id = state.bag.pop();
+  state.currentPick = id;
+  return vis.find(p => p.id === id) || null;
+}
+function showPick(){
+  if (!state.searched){ toast("Run a search first."); return; }
+  const p = nextPick();
+  if (!p){ toast("No places match your filters right now."); return; }
+  $("#sheetCard").innerHTML = cardHTML(p);
+  $("#sheet").hidden = false;
+}
+function closeSheet(){ $("#sheet").hidden = true; }
+$("#btnPick").addEventListener("click", showPick);
+$("#sheetNext").addEventListener("click", showPick);
+$("#sheetClose").addEventListener("click", closeSheet);
+$("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+</script>
+</body>
+</html>
