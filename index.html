@@ -197,7 +197,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  Version 2 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -343,7 +343,7 @@ function setCenter(lat, lon, label, opts){
   else meMarker = L.marker([lat, lon], {icon: L.divIcon({className:"", html:'<div class="me-pin"></div>', iconSize:[18,18], iconAnchor:[9,9]}), keyboard:false}).addTo(map);
   if (radiusCircle) radiusCircle.setLatLng([lat, lon]).setRadius(state.radiusMi * MI);
   else radiusCircle = L.circle([lat, lon], {radius: state.radiusMi * MI, color:"#2563eb", weight:1, fillOpacity:.05, interactive:false}).addTo(map);
-  if (opts.pan) map.panTo([lat, lon]); else map.setView([lat, lon], zoomFor(state.radiusMi));
+  try{ if (opts.pan) map.panTo([lat, lon]); else map.setView([lat, lon], zoomFor(state.radiusMi)); }catch(_){ state.needFit = true; }
 }
 
 map.on("click", e => {
@@ -363,7 +363,7 @@ function showTab(name){
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   $("#listView").hidden = name !== "list";
   $("#mapView").hidden = name !== "map";
-  if (name === "map") setTimeout(() => map.invalidateSize(), 50);
+  if (name === "map") setTimeout(() => { map.invalidateSize(); if (state.needFit) fitToRadius(); }, 50);
 }
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -544,46 +544,91 @@ function toPlace(el, center){
   };
 }
 
-const ENDPOINTS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
-async function overpass(q){
-  let lastErr;
-  for (const url of ENDPOINTS){
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 35000);
-    try{
-      const r = await fetch(url, {method:"POST", body:"data=" + encodeURIComponent(q), headers:{"Content-Type":"application/x-www-form-urlencoded"}, signal:ctl.signal});
-      clearTimeout(timer);
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return await r.json();
-    }catch(err){ clearTimeout(timer); lastErr = err; }
-  }
-  throw lastErr;
+/* Several free public Overpass servers. All are asked at once; the first good answer wins and the rest are cancelled. */
+const ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+];
+const SEARCH_TIMEOUT_MS = 25000;
+let searchCtl = null;
+
+function overpass(q, outerSignal){
+  const ctls = ENDPOINTS.map(() => new AbortController());
+  const abortAll = () => ctls.forEach(c => c.abort());
+  outerSignal.addEventListener("abort", abortAll, {once:true});
+  const timer = setTimeout(abortAll, SEARCH_TIMEOUT_MS);
+  const tries = ENDPOINTS.map(async (url, i) => {
+    const r = await fetch(url + "?data=" + encodeURIComponent(q), {signal: ctls[i].signal});
+    if (r.status === 429 || r.status === 504) throw new Error("busy");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const json = await r.json();
+    // Overpass reports server-side timeouts as HTTP 200 with a "remark" and no data
+    if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) throw new Error("busy");
+    return json;
+  });
+  return Promise.any(tries).then(
+    json => { clearTimeout(timer); abortAll(); return json; },
+    () => { clearTimeout(timer); throw new Error(outerSignal.aborted ? "cancelled" : "failed"); }
+  );
+}
+
+function fitToRadius(){
+  // Leaflet can't size a hidden map (it throws), so only fit when the map tab is showing.
+  if ($("#mapView").hidden || !radiusCircle) { state.needFit = true; return; }
+  try{ map.invalidateSize(); map.fitBounds(radiusCircle.getBounds(), {padding:[10,10]}); state.needFit = false; }catch(_){}
 }
 
 async function runSearch(){
+  if (searchCtl){ searchCtl.abort(); return; }            // second tap = cancel
   if (!state.center){ toast("Set a location first."); $("#locLabel").scrollIntoView({behavior:"smooth", block:"center"}); return; }
   const btn = $("#btnSearch");
-  btn.disabled = true; btn.textContent = "Searching...";
-  $("#status").innerHTML = '<span class="spin"></span>Looking for places nearby...';
+  searchCtl = new AbortController();
+  btn.textContent = "Cancel search";
+  const t0 = Date.now();
+  const st = $("#status");
+  const tick = () => { st.innerHTML = `<span class="spin"></span>Looking for places nearby... ${Math.round((Date.now() - t0) / 1000)}s`; };
+  tick(); const ticker = setInterval(tick, 1000);
   $("#cards").innerHTML = "";
   $("#results").scrollIntoView({behavior:"smooth", block:"start"});
+
   const {lat, lon} = state.center;
   const center = {lat, lon};
   const R = Math.round(state.radiusMi * MI);
   const types = [...state.types].join("|");
-  const q = `[out:json][timeout:25];nwr["amenity"~"^(${types})$"]["name"](around:${R},${lat},${lon});out center tags 1000;`;
+  const q = `[out:json][timeout:20];nw["amenity"~"^(${types})$"]["name"](around:${R},${lat},${lon});out center tags 400;`;
+
+  let json = null, errMsg = "";
   try{
-    const json = await overpass(q);
+    json = await overpass(q, searchCtl.signal);
+  }catch(err){
+    errMsg = err.message;
+  }finally{
+    clearInterval(ticker);
+    searchCtl = null;
+    btn.textContent = "Find restaurants";
+  }
+
+  if (!json){
+    state.places = [];
+    st.innerHTML = errMsg === "cancelled"
+      ? 'Search cancelled. <button class="link" type="button" id="retry">Search again</button>'
+      : `The free map data servers are busy or didn't answer within ${SEARCH_TIMEOUT_MS / 1000}s. Try again, or use a smaller distance. <button class="link" type="button" id="retry">Try again</button>`;
+    return;
+  }
+
+  // Data processing and drawing are kept separate from the network call, so a display bug can't look like a server failure.
+  try{
     const seen = new Set();
     state.places = (json.elements || []).map(el => toPlace(el, center)).filter(p => p && !seen.has(p.id) && seen.add(p.id));
     state.searched = true; state.bag = [];
-    map.fitBounds(radiusCircle.getBounds(), {padding:[10,10]});
     render();
   }catch(err){
-    state.places = [];
-    $("#status").innerHTML = 'The map data service is busy or unreachable. <button class="link" type="button" id="retry">Try again</button>';
-  }finally{
-    btn.disabled = false; btn.textContent = "Find restaurants";
+    st.textContent = "Got results but couldn't display them: " + err.message;
+    console.error(err);
+    return;
   }
+  fitToRadius();
 }
 $("#btnSearch").addEventListener("click", runSearch);
 document.addEventListener("click", e => { if (e.target.id === "retry") runSearch(); });
