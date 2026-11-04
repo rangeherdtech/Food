@@ -156,6 +156,8 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
         <label><input type="checkbox" value="restaurant" checked> Restaurants</label>
         <label><input type="checkbox" value="fast_food" checked> Fast food</label>
         <label><input type="checkbox" value="cafe"> Caf&eacute;s</label>
+        <label><input type="checkbox" value="shop:deli" checked> Delis</label>
+        <label><input type="checkbox" value="shop:bakery"> Bakeries</label>
         <label><input type="checkbox" value="bar|pub"> Bars &amp; pubs</label>
       </div>
     </div>
@@ -214,7 +216,7 @@ footer{max-width:720px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font
 <div class="toast" id="toast" role="status"></div>
 
 <footer>
-  Version 6 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
+  Version 7 &middot; Data &copy; OpenStreetMap contributors, via Overpass and Nominatim. Listings are community-edited, so hours, cuisine and price can be missing or out of date.
   "Open now" uses your device's clock against each place's listed hours.
 </footer>
 
@@ -327,7 +329,7 @@ function openStatus(str, now){
 /* ---------- state ---------- */
 const state = {
   center: null, label: "", radiusMi: 2, maxPrice: 0, openNow: false,
-  types: new Set(["restaurant","fast_food"]),
+  types: new Set(["restaurant","fast_food","shop:deli"]),
   excluded: new Set(), keywords: [],
   places: [], visible: [], searched: false, showHidden: false,
   pinMode: false, bag: [], currentPick: null, sort: "best"
@@ -548,6 +550,8 @@ function toPlace(el, center){
   const lon = el.lon != null ? el.lon : el.center && el.center.lon;
   if (lat == null || lon == null || !t.name) return null;
   const cuisines = String(t.cuisine || "").split(";").map(c => c.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")).filter(Boolean);
+  if (!cuisines.length && t.shop === "deli") cuisines.push("deli");
+  if (!cuisines.length && t.shop === "bakery") cuisines.push("bakery");
   const cuisineText = cuisines.map(c => c.replace(/_/g, " "));
   const addr = [[t["addr:housenumber"], t["addr:street"]].filter(Boolean).join(" "), t["addr:city"]].filter(Boolean).join(", ");
   const diet = [];
@@ -560,7 +564,7 @@ function toPlace(el, center){
   return {
     id: el.type + el.id, name: t.name, lat, lon,
     dist: haversineMi(center.lat, center.lon, lat, lon),
-    amenity: t.amenity, cuisines, cuisineSet: new Set(cuisines),
+    amenity: t.amenity || t.shop || "", cuisines, cuisineSet: new Set(cuisines),
     cuisineLabel: cuisineText.map(title).join(", "),
     hay: norm([t.name, t.brand, t.description, cuisineText.join(" ")].filter(Boolean).join(" ")),
     hours: t.opening_hours || "", price: parsePrice(t), addr, diet, site, phone,
@@ -620,7 +624,7 @@ function overpass(q, outerSignal, report){
 }
 
 /* Source 2 (backup): Nominatim, the same service the address box uses. Max ~40 results per place type, 1 request/second. */
-const NOM_PHRASE = {restaurant: "restaurant", fast_food: "fast food", cafe: "cafe", bar: "bar", pub: "pub"};
+const NOM_PHRASE = {restaurant: "restaurant", fast_food: "fast food", cafe: "cafe", bar: "bar", pub: "pub", "shop:deli": "deli", "shop:bakery": "bakery"};
 const sleep = (ms, signal) => new Promise((res, rej) => {
   const t = setTimeout(res, ms);
   signal.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("Aborted", "AbortError")); }, {once:true});
@@ -638,10 +642,11 @@ async function nominatimPlaces(center, radiusMi, types, signal, report){
       if (!r.ok) throw new Error("HTTP " + r.status);
       const arr = await r.json(); ok++;
       for (const d of arr){
-        if (d.category !== "amenity" || !types.includes(d.type)) continue;
+        const isShop = d.category === "shop";
+        if (!(d.category === "amenity" || isShop) || !types.includes(isShop ? "shop:" + d.type : d.type)) continue;
         const a = d.address || {}, x = d.extratags || {};
         out.push({type: d.osm_type, id: d.osm_id, lat: +d.lat, lon: +d.lon, tags: Object.assign({}, x, {
-          amenity: d.type, name: d.name || (a[d.type]) || "",
+          [isShop ? "shop" : "amenity"]: d.type, name: d.name || (a[d.type]) || "",
           "addr:housenumber": a.house_number, "addr:street": a.road, "addr:city": a.city || a.town || a.village || a.suburb
         })});
       }
@@ -680,7 +685,11 @@ async function runSearch(){
   const center = {lat, lon};
   const R = Math.round(state.radiusMi * MI);
   const typeList = [...state.types].flatMap(t => t.split("|"));
-  const q = `[out:json][timeout:${overpassTimeoutMs(state.radiusMi) / 1000}];nw["amenity"~"^(${typeList.join("|")})$"]["name"](around:${R},${lat},${lon});out center ${state.radiusMi > 10 ? 1500 : 400};`;
+  const amenityTypes = typeList.filter(t => !t.startsWith("shop:")), shopTypes = typeList.filter(t => t.startsWith("shop:")).map(t => t.slice(5));
+  const parts = [];
+  if (amenityTypes.length) parts.push(`nw["amenity"~"^(${amenityTypes.join("|")})$"]["name"](around:${R},${lat},${lon});`);
+  if (shopTypes.length) parts.push(`nw["shop"~"^(${shopTypes.join("|")})$"]["name"](around:${R},${lat},${lon});`);
+  const q = `[out:json][timeout:${overpassTimeoutMs(state.radiusMi) / 1000}];(${parts.join("")});out center ${state.radiusMi > 10 ? 1500 : 400};`;
 
   const problems = [];
   const report = m => problems.push(m);
@@ -832,7 +841,7 @@ async function checkTopForChains(){
   if (!picks.length) return;
   const {lat, lon} = state.center;
   const q = "[out:json][timeout:20];" + picks.map(p =>
-    `nw["amenity"]["name"~"^(the )?${overpassRe(p.name)}",i](around:80000,${lat},${lon});out count;`).join("");
+    `nw["amenity"]["name"~"^(the )?${overpassRe(p.name)}",i](around:80000,${lat},${lon});out count;nw["shop"~"^(deli|bakery)$"]["name"~"^(the )?${overpassRe(p.name)}",i](around:80000,${lat},${lon});out count;`).join("");
   state.chainChecking = true; render();
   let json = null;
   try{ json = await overpass(q, new AbortController().signal, () => {}); }catch(_){}
@@ -842,7 +851,7 @@ async function checkTopForChains(){
   const counts = (json.elements || []).filter(e => e.type === "count");
   let found = 0;
   picks.forEach((p, i) => {
-    const n = counts[i] ? +counts[i].tags.total || 0 : 0;
+    const n = (counts[2 * i] ? +counts[2 * i].tags.total || 0 : 0) + (counts[2 * i + 1] ? +counts[2 * i + 1].tags.total || 0 : 0);
     wideCounts.set(chainKey(p.name), n);
     if (n >= 3) found++;
   });
@@ -899,6 +908,7 @@ function scorePlaces(list){
     else if (barFirst) add(-8, "bar or pub");
     else if (p.amenity === "restaurant") add(6, "sit-down");
     else if (p.amenity === "cafe") add(3, "café");
+    else if (p.amenity === "deli" || p.amenity === "bakery") add(3, p.amenity);
     else if (p.amenity === "fast_food" && !scope) add(2, "independent counter service");
 
     const details = [p.hours, p.site, p.phone, p.addr, p.price && !p.price.est].filter(Boolean).length + (p.diet.length ? 1 : 0);
@@ -908,7 +918,7 @@ function scorePlaces(list){
 
     p.baseScore = s;
     p.award = m ? m[1] : ""; p.awardPts = m ? m[0] : 0; p.starred = !!(m && m[2]);
-    const foodFirst = p.amenity === "restaurant" || p.amenity === "cafe" || (barFirst && specific.length > 0);
+    const foodFirst = p.amenity === "restaurant" || p.amenity === "cafe" || p.amenity === "deli" || p.amenity === "bakery" || (barFirst && specific.length > 0);
     p.gem = !p.chain && !p.starred && !p.notable && !sportsBar && foodFirst && specific.length > 0 && details >= 1;
     p.why = why;
   }
